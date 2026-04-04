@@ -1,0 +1,56 @@
+{
+  "waves": [
+    {
+      "wave": 1,
+      "monsters": [
+        {"id": "poison_frog", "count": 10, "interval": 1.0}
+      ],
+      "reward": 50
+    },
+    {
+      "wave": 2,
+      "monsters": [
+        {"id": "poison_frog", "count": 5, "interval": 0.8},
+        {"id": "toucan", "count": 5, "interval": 1.2}
+      ],
+      "reward": 70
+    },
+    {
+      "wave": 5,
+      "name": "First Challenge",
+      "monsters": [
+        {"id": "traitor_capy", "count": 1, "interval": 0},
+        {"id": "baby_monkey", "count": 20, "interval": 0.5}
+      ],
+      "reward": 200
+    },
+    {
+      "wave": 10,
+      "name": "Elite Arrival",
+      "monsters": [
+        {"id": "anaconda", "count": 2, "interval": 5.0},
+        {"id": "armadillo", "count": 10, "interval": 1.0}
+      ],
+      "reward": 500
+    },
+    {
+      "wave": 15,
+      "name": "Caiman Mini-Boss",
+      "monsters": [
+        {"id": "caiman_miniboss", "count": 1, "interval": 0},
+        {"id": "poison_toad", "count": 15, "interval": 0.8}
+      ],
+      "reward": 1500
+    },
+    {
+      "wave": 20,
+      "name": "The Jaguar",
+      "monsters": [
+        {"id": "jaguar_boss", "count": 1, "interval": 0},
+        {"id": "boar", "count": 10, "interval": 1.0},
+        {"id": "poison_eagle", "count": 5, "interval": 2.0}
+      ],
+      "reward": 5000
+    }
+  ]
+}
