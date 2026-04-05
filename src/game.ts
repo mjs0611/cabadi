@@ -267,6 +267,12 @@ export class Game {
           b.vx = b.vx/nl*spd; b.vy = b.vy/nl*spd;
         }
       }
+      // VFX: Rotation & Stretch
+      if (b.rotation !== undefined) b.rotation += 0.2;
+      const speed = Math.sqrt(b.vx * b.vx + b.vy * b.vy);
+      if (b.stretch !== undefined) b.stretch = Math.min(2.5, speed / 5);
+      if (b.pulse !== undefined) b.pulse = 1 + Math.sin(now / 50) * 0.2;
+
       b.x += b.vx; b.y += b.vy;
       if (b.x < -100 || b.x > w+100 || b.y < -100 || b.y > h+100) { b.dead = true; continue; }
 
@@ -295,7 +301,14 @@ export class Game {
     }
 
     // Effect cleanup
-    this.particles.forEach(p => { p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life++; p.alpha = 1 - p.life/p.maxLife; p.radius *= 0.97; });
+    this.particles.forEach(p => { 
+      p.x += p.vx; p.y += p.vy; 
+      p.vy += 0.05; 
+      p.life++; 
+      p.alpha = 1 - p.life/p.maxLife; 
+      p.radius *= 0.97;
+      if (p.rotation !== undefined) p.rotation += 0.1;
+    });
     this.floatingTexts.forEach(ft => { ft.y -= 0.5; ft.life++; });
     this.enemies = this.enemies.filter(e => !e.dead);
     this.bullets = this.bullets.filter(b => !b.dead);
@@ -388,9 +401,44 @@ export class Game {
       const a = angle + (i - (count-1)/2)*spread;
       const btx = cx + Math.cos(a)*100, bty = cy + Math.sin(a)*100;
       const bullet = createBullet(cx, cy, btx, bty, speed, damage, pierce, hasExplo, type, color);
+      
+      // Level-based VFX assignments
+      const skill = this.state.activeSkills.find(s => s.type === type);
+      const lv = skill?.level ?? 1;
+
+      if (type === 'acorn_cannon') {
+        if (lv >= 4) bullet.rotation = 0;
+        if (lv >= 7) bullet.stretch = 1;
+      } else if (type === 'coconut_bomb') {
+        if (lv >= 4) bullet.pulse = 1;
+      }
+
       if (type === 'homing_seed') bullet.isHoming = true;
       this.bullets.push(bullet);
+      
+      // Level 10 screen shake for strong skills
+      if (lv === 10 && (type === 'acorn_cannon' || type === 'coconut_bomb' || type === 'palm_fall')) {
+        this.applyScreenShake(10, 200);
+      }
     }
+  }
+
+  private applyScreenShake(intensity: number, duration: number) {
+    const originalX = 0, originalY = 0;
+    const startTime = performance.now();
+    const shake = () => {
+      const elapsed = performance.now() - startTime;
+      if (elapsed < duration) {
+        const factor = 1 - elapsed / duration;
+        const sx = (Math.random() - 0.5) * intensity * factor;
+        const sy = (Math.random() - 0.5) * intensity * factor;
+        this.canvas.style.transform = `translate(${sx}px, ${sy}px)`;
+        requestAnimationFrame(shake);
+      } else {
+        this.canvas.style.transform = 'translate(0,0)';
+      }
+    };
+    shake();
   }
 
   private explode(x: number, y: number, damage: number, radius: number) {

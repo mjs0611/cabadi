@@ -4,10 +4,22 @@ export interface CapyUpgrades {
   fireRate: number;   // 0~8   (-5% cooldown per level)
   startSkills: number; // 0~4  (extra starting skill slots)
   coinBoost: number;  // 0~5   (+15% banana earn per level)
+  critChance: number; // 0~10  (+3% crit chance per level)
+  lifeSteal: number;  // 0~5   (+1 HP gain chance per level)
+  reflect: number;    // 0~5   (Reflect damage % per level)
+  unlockedSkills: string[];
+  startingSkillId: string;
+  unlockedCapyTypes: string[];
+  selectedCapyType: string;
 }
 
 const DEFAULT_UPGRADES: CapyUpgrades = {
   maxHp: 0, damage: 0, fireRate: 0, startSkills: 0, coinBoost: 0,
+  critChance: 0, lifeSteal: 0, reflect: 0,
+  unlockedSkills: ['acorn_cannon'],
+  startingSkillId: 'acorn_cannon',
+  unlockedCapyTypes: ['standard'],
+  selectedCapyType: 'standard',
 };
 
 function bKey(hash: string) { return `bananas_${hash}`; }

@@ -17,6 +17,7 @@ export function getRandomMonster(wave: number) {
   else if (wave >= 5) tier = Math.random() < 0.3 ? 'intermediate' : 'normal';
 
   const list = MONSTERS[tier];
-  const monster = list[Math.floor(Math.random() * list.length)];
-  return { ...monster, isBoss: tier === 'boss' };
+  const idxInTier = Math.floor(Math.random() * list.length);
+  const monster = list[idxInTier];
+  return { ...monster, isBoss: tier === 'boss', tier, idx: idxInTier };
 }

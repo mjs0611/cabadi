@@ -2,7 +2,8 @@
   "skills": {
     "acorn_cannon": {
       "name": "도토리 캐논",
-      "type": "Rapid Fire",
+      "type": "연사",
+      "tier": "normal",
       "levels": [
         {"level": 1, "damage": 10, "cooldown": 0.5, "speed": 400},
         {"level": 2, "damage": 12, "cooldown": 0.48, "speed": 420},
@@ -18,7 +19,8 @@
     },
     "poison_thorn": {
       "name": "독가시",
-      "type": "Piercing",
+      "type": "관통",
+      "tier": "rare",
       "levels": [
         {"level": 1, "damage": 6, "poison_dot": 3, "pierce": 1},
         {"level": 2, "damage": 8, "poison_dot": 5, "pierce": 1},
@@ -34,7 +36,8 @@
     },
     "coconut_bomb": {
       "name": "코코넛 폭탄",
-      "type": "Explosive",
+      "type": "폭발",
+      "tier": "unique",
       "levels": [
         {"level": 1, "damage": 40, "radius": 50},
         {"level": 2, "damage": 50, "radius": 55},
@@ -50,7 +53,8 @@
     },
     "mango_laser": {
       "name": "망고 레이저",
-      "type": "Beam",
+      "type": "레이저",
+      "tier": "unique",
       "levels": [
         {"level": 1, "damage": 20, "cooldown": 0.5, "speed": 800, "pierce": 99},
         {"level": 2, "damage": 25, "cooldown": 0.45, "speed": 820, "pierce": 99},
@@ -66,7 +70,8 @@
     },
     "homing_seed": {
       "name": "추적 씨앗",
-      "type": "Homing",
+      "type": "유도",
+      "tier": "rare",
       "levels": [
         {"level": 1, "damage": 20, "speed": 350, "cooldown": 1.0},
         {"level": 2, "damage": 25, "speed": 370, "cooldown": 0.9},
@@ -82,7 +87,8 @@
     },
     "mud_artillery": {
       "name": "진흙 대포",
-      "type": "Slow/CC",
+      "type": "감속/방해",
+      "tier": "hero",
       "levels": [
         {"level": 1, "damage": 10, "slow_percent": 30, "cooldown": 1.0},
         {"level": 2, "damage": 15, "slow_percent": 35, "cooldown": 0.95},
@@ -98,7 +104,8 @@
     },
     "tropical_lightning": {
       "name": "열대 번개",
-      "type": "Chain",
+      "type": "연쇄",
+      "tier": "hero",
       "levels": [
         {"level": 1, "damage": 30, "chains": 0, "cooldown": 0.8},
         {"level": 2, "damage": 40, "chains": 0, "cooldown": 0.7},
@@ -114,7 +121,8 @@
     },
     "palm_fall": {
       "name": "야자수 폭격",
-      "type": "Bomber",
+      "type": "폭격",
+      "tier": "legendary",
       "levels": [
         {"level": 1, "damage": 150, "cooldown": 6.0, "radius": 80},
         {"level": 2, "damage": 200, "cooldown": 5.5, "radius": 90},

@@ -10,6 +10,8 @@ export interface Enemy {
   gold: number;
   dead: boolean;
   isBoss?: boolean;
+  tier: string;
+  idx: number;
   status: {
     poisoned?: { dps: number; msLeft: number };
     slowed?: { factor: number; msLeft: number };
@@ -32,6 +34,10 @@ export interface Bullet {
   color: string;
   isHoming?: boolean;
   homingTarget?: Enemy | null;
+  // VFX
+  rotation?: number;
+  stretch?: number;
+  pulse?: number;
 }
 
 export interface PalmDrop {
@@ -53,6 +59,9 @@ export interface Particle {
   color: string;
   life: number;
   maxLife: number;
+  vfxIdx?: number;
+  rotation?: number;
+  stretch?: number;
 }
 
 export interface FloatingText {
@@ -81,12 +90,14 @@ export function createEnemy(canvasW: number, canvasH: number, wave: number): Ene
     id: data.id,
     type: data.id,
     x, y,
-    radius: data.isBoss ? 50 : (data.hp > 300 ? 24 : 18),
+    radius: data.isBoss ? 25 : (data.hp > 300 ? 12 : 9),
     hp, maxHp: hp,
     speed: data.speed / 100,
     gold: data.gold,
     dead: false,
     isBoss: data.isBoss,
+    tier: data.tier, // We need to ensure data.tier exists
+    idx: data.idx || 0, // We need to ensure data.idx exists
     status: {}
   };
 }
@@ -110,14 +121,15 @@ export function createFloatingText(x: number, y: number, text: string, color = '
   return { x, y, text, color, life: 0, maxLife: 40 };
 }
 
-export function createParticle(x: number, y: number, color: string, count = 6): Particle[] {
+export function createParticle(x: number, y: number, color: string, count = 6, vfxIdx?: number): Particle[] {
   return Array.from({ length: count }, () => {
     const angle = Math.random() * Math.PI * 2;
     const speed = 1 + Math.random() * 3;
     return {
       x, y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed,
       radius: 2 + Math.random()*3, alpha: 1, color,
-      life: 0, maxLife: 20 + Math.random()*20
+      life: 0, maxLife: 20 + Math.random()*20,
+      vfxIdx
     };
   });
 }

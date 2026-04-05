@@ -50,4 +50,28 @@ export const CAPY_SHOP: ShopItem[] = [
     maxLevel: 5,
     cost: (lv) => (lv + 1) * 150,
   },
+  {
+    id: 'critChance',
+    icon: '💥',
+    name: '날카로운 발톱',
+    effectPerLevel: '치명타 확률 +3%',
+    maxLevel: 10,
+    cost: (lv) => (lv + 1) * 120,
+  },
+  {
+    id: 'lifeSteal',
+    icon: '❤️‍🩹',
+    name: '흡혈 식물',
+    effectPerLevel: '처치 시 HP 회복 기회 +5%',
+    maxLevel: 5,
+    cost: (lv) => (lv + 1) * 200,
+  },
+  {
+    id: 'reflect',
+    icon: '🛡️',
+    name: '가시 넝쿨',
+    effectPerLevel: '데미지 반사 +10%',
+    maxLevel: 5,
+    cost: (lv) => (lv + 1) * 180,
+  },
 ];
