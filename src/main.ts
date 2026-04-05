@@ -17,7 +17,7 @@ import {
 const AIT_AD_GROUP_ID = 'ait.v2.live.CABADI_AD_GROUP_ID'; // TODO: 등록 후 교체
 
 // ── AdMob ────────────────────────────────────────────────────────────────────
-const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-4557219410513767/CABADI_AD_UNIT_ID'; // TODO: AdMob 등록 후 교체
+const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-4557219410513767/2917356306';
 type AdMobType = typeof import('@capacitor-community/admob').AdMob;
 type InterstitialEventsType = typeof import('@capacitor-community/admob').InterstitialAdPluginEvents;
 let AdMobPlugin: AdMobType | null = null;
