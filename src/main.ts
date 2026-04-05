@@ -16,6 +16,84 @@ import {
 // ── AIT ──────────────────────────────────────────────────────────────────────
 const AIT_AD_GROUP_ID = 'ait.v2.live.CABADI_AD_GROUP_ID'; // TODO: 등록 후 교체
 
+// ── AdMob ────────────────────────────────────────────────────────────────────
+const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-4557219410513767/CABADI_AD_UNIT_ID'; // TODO: AdMob 등록 후 교체
+type AdMobType = typeof import('@capacitor-community/admob').AdMob;
+type InterstitialEventsType = typeof import('@capacitor-community/admob').InterstitialAdPluginEvents;
+let AdMobPlugin: AdMobType | null = null;
+let InterstitialEvents: InterstitialEventsType | null = null;
+let adLoaded = false;
+import('@capacitor-community/admob').then((m) => {
+  AdMobPlugin = m.AdMob;
+  InterstitialEvents = m.InterstitialAdPluginEvents;
+  AdMobPlugin.initialize({ requestTrackingAuthorization: false }).then(() => preloadAdMob()).catch(() => {});
+}).catch(() => {});
+
+async function preloadAdMob() {
+  if (!AdMobPlugin) return;
+  try {
+    await AdMobPlugin.prepareInterstitial({ adId: ADMOB_INTERSTITIAL_ID });
+    adLoaded = true;
+  } catch { adLoaded = false; }
+}
+
+let adFallbackInterval: ReturnType<typeof setInterval> | null = null;
+function showAdFallback(onDone: () => void) {
+  const el = document.getElementById('adScreen')!;
+  el.classList.add('show');
+  let cnt = 5;
+  document.getElementById('adCount')!.textContent = String(cnt);
+  adFallbackInterval = setInterval(() => {
+    cnt--;
+    document.getElementById('adCount')!.textContent = String(cnt);
+    if (cnt <= 0) {
+      clearInterval(adFallbackInterval!);
+      el.classList.remove('show');
+      onDone();
+    }
+  }, 1000);
+}
+
+async function showAd(onDone: () => void) {
+  // 1. AIT 광고
+  if (ait && aitAdLoaded) {
+    aitAdLoaded = false;
+    ait.showFullScreenAd({
+      options: { adGroupId: AIT_AD_GROUP_ID },
+      onEvent: (event) => {
+        if (event.type === 'dismissed' || event.type === 'userEarnedReward') {
+          onDone();
+          preloadAd();
+        } else if (event.type === 'failedToShow') {
+          showAdFallback(onDone);
+        }
+      },
+      onError: () => { showAdFallback(onDone); },
+    });
+    return;
+  }
+  // 2. AdMob (Capacitor Android)
+  if (AdMobPlugin && InterstitialEvents && adLoaded) {
+    adLoaded = false;
+    try {
+      const dismissed = await AdMobPlugin.addListener(InterstitialEvents.Dismissed, () => {
+        onDone();
+        preloadAdMob();
+        dismissed.remove();
+      });
+      const failed = await AdMobPlugin.addListener(InterstitialEvents.FailedToShow, () => {
+        showAdFallback(onDone);
+        failed.remove();
+        dismissed.remove();
+      });
+      await AdMobPlugin.showInterstitial();
+      return;
+    } catch { showAdFallback(onDone); return; }
+  }
+  // 3. Fallback (둘 다 없을 때)
+  showAdFallback(onDone);
+}
+
 type AitModule = {
   submitGameCenterLeaderBoardScore: typeof import('@apps-in-toss/web-framework').submitGameCenterLeaderBoardScore;
   openGameCenterLeaderboard: typeof import('@apps-in-toss/web-framework').openGameCenterLeaderboard;
@@ -101,6 +179,8 @@ const closeNo           = document.getElementById('closeNo')!;
 const closeYes          = document.getElementById('closeYes')!;
 const waveAnnounce      = document.getElementById('waveAnnounce')!;
 const baseFlash         = document.getElementById('baseFlash')!;
+const doubleBananaBtn   = document.getElementById('doubleBananaBtn') as HTMLButtonElement;
+const introAdBuffBtn    = document.getElementById('introAdBuffBtn') as HTMLButtonElement;
 
 // ── 사운드 / 백그라운드 처리 ──────────────────────────────────────────────────
 soundBtn.addEventListener('click', () => {
@@ -207,8 +287,7 @@ function onBossSpawn(_enemy: Enemy) {
 
 function onWaveClear() {
   state.phase = 'upgrade';
-  addBananas(userHash, state.sessionBananas > 0
-    ? Math.round((state.wave - 1) * 5 * state.bananaMultiplier) : 0);
+  // 바나나는 onGameOver에서 sessionBananas 일괄 저장 — 여기서 중복 저장 안 함
   updateMissionProgress(userHash, 'waves', 1);
   updateMissionProgress(userHash, 'session_bananas', state.sessionBananas);
   sound.waveClear();
@@ -233,6 +312,7 @@ function onGameOver() {
   goBest.textContent = `최고 기록 ${best} WAVES`;
   goBananaEarned.textContent = `+${totalEarned} 🍌 획득`;
   gameOverEl.classList.add('show');
+  if (totalEarned > 0) doubleBananaBtn.style.display = 'block';
 
   sound.gameOver();
   ait?.generateHapticFeedback({ type: 'error' }).catch(() => {});
@@ -242,24 +322,30 @@ function onGameOver() {
 // ── 부활 (광고 시청) ──────────────────────────────────────────────────────────
 reviveBtn.addEventListener('click', () => {
   reviveBtn.style.display = 'none';
-  if (ait && aitAdLoaded) {
-    aitAdLoaded = false;
-    ait.showFullScreenAd({
-      options: { adGroupId: AIT_AD_GROUP_ID },
-      onEvent: (event) => {
-        if (event.type === 'dismissed' || event.type === 'userEarnedReward') {
-          doRevive();
-          preloadAd();
-        } else if (event.type === 'failedToShow') {
-          doRevive(); // 광고 실패해도 부활
-        }
-      },
-      onError: () => { doRevive(); },
-    });
-  } else {
-    // AIT 환경 아니거나 광고 미로드 → 그냥 부활
-    doRevive();
-  }
+  showAd(() => doRevive());
+});
+
+// ── 보상 2배 (광고 시청) ──────────────────────────────────────────────────────
+doubleBananaBtn.addEventListener('click', () => {
+  showAd(() => {
+    doubleBananaBtn.style.display = 'none';
+    addBananas(userHash, state.sessionBananas); // 한 번 더 추가 (2배 효과)
+    goBananaEarned.textContent = `+${state.sessionBananas * 2} 🍌 획득 (2배!)`;
+  });
+});
+
+// ── 시작 버프 (광고 시청) ──────────────────────────────────────────────────────
+introAdBuffBtn.addEventListener('click', () => {
+  showAd(() => {
+    state.adBuffActive = true;
+    state.damageMultiplier *= 1.3;
+    state.fireRateMultiplier *= 0.8;
+    introAdBuffBtn.textContent = '✅ 공격 버프 활성화됨 (+30%)';
+    introAdBuffBtn.style.background = 'rgba(100,255,100,0.1)';
+    introAdBuffBtn.style.borderColor = '#66ff66';
+    introAdBuffBtn.style.color = '#66ff66';
+    introAdBuffBtn.disabled = true;
+  });
 });
 
 function doRevive() {

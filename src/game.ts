@@ -190,12 +190,24 @@ export class Game {
 
       // 기지 충돌
       if (len < 40 + e.radius) {
-        e.dead = true;
         const dmg = e.isBoss ? 30 : e.maxHp > 1000 ? 20 : 10;
         this.state.hp -= dmg;
         this.onHpChange(this.state.hp, this.state.maxHp);
         this.onBaseFlash();
-        this.particles.push(...createParticle(e.x, e.y, '#ff4d6d', 8));
+
+        // Reflect Damage
+        if (this.state.reflectPercent > 0) {
+          const reflectDmg = dmg * this.state.reflectPercent;
+          e.hp -= reflectDmg;
+          this.particles.push(...createParticle(e.x, e.y, '#aaffff', 8, 0));
+          this.floatingTexts.push(createFloatingText(e.x, e.y - 20, `↩${Math.round(reflectDmg)}`, '#aaffff'));
+          if (e.hp <= 0) this.killEnemy(e);
+        } else {
+          this.particles.push(...createParticle(e.x, e.y, '#ff4d6d', 8));
+        }
+
+        e.dead = true;
+
         if (this.state.hp <= 0) {
           this.state.hp = 0;
           this.stop();
@@ -262,11 +274,19 @@ export class Game {
         if (e.dead || b.hitEnemies.has(e)) continue;
         const dx = b.x - e.x, dy = b.y - e.y;
         if (dx*dx + dy*dy < (b.radius + e.radius)**2) {
-          b.hitEnemies.add(e); e.hp -= b.damage;
-          this.particles.push(...createParticle(b.x, b.y, b.color, 4));
-          this.floatingTexts.push(createFloatingText(e.x, e.y, `-${Math.round(b.damage)}`, '#ff9a3c'));
+          b.hitEnemies.add(e); 
+          let finalDmg = b.damage;
+          const isCrit = Math.random() < this.state.critChance;
+          if (isCrit) {
+            finalDmg *= 2;
+            this.floatingTexts.push(createFloatingText(e.x, e.y - 20, 'CRIT!', '#ff0055'));
+          }
+          e.hp -= finalDmg;
+          // VFX: Impact Spark (0)
+          this.particles.push(...createParticle(b.x, b.y, b.color, 4, 0));
+          this.floatingTexts.push(createFloatingText(e.x, e.y, `-${Math.round(finalDmg)}`, isCrit ? '#ff0055' : '#ff9a3c'));
           sound.monsterHit();
-          if (b.hasExplosion) this.explode(b.x, b.y, b.damage * 0.5, 80);
+          if (b.hasExplosion) this.explode(b.x, b.y, finalDmg * 0.5, 80);
           this.applySkillEffect(b.originType, e);
           if (e.hp <= 0) { e.dead = true; this.killEnemy(e); }
           if (b.pierce <= 0) { b.dead = true; break; } else { b.pierce--; }
@@ -294,11 +314,19 @@ export class Game {
 
   private killEnemy(e: Enemy) {
     this.state.score++;
-    this.particles.push(...createParticle(e.x, e.y, '#ffffff', 12));
+    // VFX: Water/Soul Splash (5)
+    this.particles.push(...createParticle(e.x, e.y, '#ffffff', 12, 5));
     sound.enemyDie();
     const earned = Math.max(1, Math.round(e.gold * this.state.bananaMultiplier));
     this.state.sessionBananas += earned;
     this.floatingTexts.push(createFloatingText(e.x, e.y - 20, `+${earned}🍌`, '#ffcc33'));
+    
+    // Life Steal
+    if (Math.random() < this.state.lifeStealChance) {
+      this.state.hp = Math.min(this.state.maxHp, this.state.hp + 1);
+      this.particles.push(...createParticle(this.canvas.width/2, this.canvas.height/2, '#ff4d6d', 4)); 
+    }
+
     this.onBananaEarned(earned);
     this.onKill(e.isBoss ?? false);
   }
@@ -309,10 +337,14 @@ export class Game {
     if (skillType === 'poison_thorn') {
       const dps = (getSkillStats(skillType, lv)?.poison_dot ?? 5) * this.state.damageMultiplier;
       target.status.poisoned = { dps, msLeft: 3000 };
+      // VFX: Poison Cloud (2)
+      this.particles.push(...createParticle(target.x, target.y, '#aaff00', 4, 2));
     }
     if (skillType === 'mud_artillery') {
       const factor = Math.max(0.2, 0.7 - lv * 0.04);
       target.status.slowed = { factor, msLeft: 2000 + lv * 200 };
+      // VFX: Mud Splash (3)
+      this.particles.push(...createParticle(target.x, target.y, '#886644', 4, 3));
     }
     if (skillType === 'tropical_lightning') {
       const chains = getSkillStats(skillType, lv)?.chains ?? 0;
@@ -326,7 +358,10 @@ export class Game {
       .sort((a,b) => ((a.x-origin.x)**2+(a.y-origin.y)**2) - ((b.x-origin.x)**2+(b.y-origin.y)**2))
       .slice(0, chains).forEach(t => {
         if (Math.sqrt((t.x-origin.x)**2+(t.y-origin.y)**2) > 200) return;
-        t.hp -= dmg; this.floatingTexts.push(createFloatingText(t.x, t.y, `⚡${Math.round(dmg)}`, '#88eeff'));
+        t.hp -= dmg; 
+        this.floatingTexts.push(createFloatingText(t.x, t.y, `⚡${Math.round(dmg)}`, '#88eeff'));
+        // VFX: Lightning (4)
+        this.particles.push(...createParticle(t.x, t.y, '#88eeff', 4, 4));
         if (t.hp <= 0) { t.dead = true; this.killEnemy(t); }
       });
   }
@@ -363,7 +398,8 @@ export class Game {
       e.hp -= damage; this.floatingTexts.push(createFloatingText(e.x, e.y, `-${Math.round(damage)}`, '#ff4d6d'));
       if (e.hp <= 0) { e.dead = true; this.killEnemy(e); }
     });
-    this.particles.push(...createParticle(x, y, '#ffcc33', 16));
+    // VFX: Explosion (1)
+    this.particles.push(...createParticle(x, y, '#ffcc33', 16, 1));
   }
 
   private getNearestEnemy(cx: number, cy: number): Enemy | null {
