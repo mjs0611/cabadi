@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>카바디</title>
-  <script type="module" crossorigin src="/assets/index-Jl-uYGGs.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-BKfsxMel.css">
+  <script type="module" crossorigin src="/assets/index-Cut5yKV6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DNcu0X3e.css">
 </head>
 <body>
 
@@ -17,6 +17,7 @@
   <div id="gameSub">RAINFOREST SURVIVOR</div>
   <button id="startBtn">START GAME</button>
   <button id="introShopBtn">🐾 카피바라 업그레이드</button>
+  <button id="introAdBuffBtn" style="background: rgba(255,204,51,0.15); border: 1.5px solid #ffcc33; color: #ffcc33; margin-top: 12px; padding: 12px 30px; border-radius: 30px; font-weight: 700; font-size: 13px; cursor: pointer;">📺 광고 보고 버프 시작 (공격력+30%)</button>
 </div>
 
 <!-- HUD -->
@@ -44,6 +45,7 @@
   <div id="goBest">최고 기록 0 WAVES</div>
   <div id="goBananaEarned">+0 🍌 획득</div>
   <button class="goBtn revive" id="reviveBtn">📺 광고 보고 부활</button>
+  <button class="goBtn primary" id="doubleBananaBtn" style="background: #ffcc33; display: none;">📺 광고 보고 보상 2배</button>
   <button class="goBtn primary" id="retryBtn">다시 도전</button>
   <button class="goBtn secondary" id="goShopBtn">🐾 업그레이드</button>
   <button class="goBtn secondary" id="goMissionsBtn">📋 일일 미션</button>
@@ -74,6 +76,12 @@
     <div id="missionsBalance">🍌 <span id="missionsBananaCount">0</span></div>
   </div>
   <div id="missionsItems"></div>
+</div>
+
+<!-- Ad Fallback (AIT/AdMob 미지원 환경) -->
+<div id="adScreen">
+  <div id="adTag">ADVERTISEMENT</div>
+  <div id="adBox"><div id="adCount">5</div></div>
 </div>
 
 <!-- Close confirmation -->
