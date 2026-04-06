@@ -61,7 +61,7 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   border-bottom: 1px solid rgba(255,255,255,0.1); z-index: 100;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-#topBar.hidden { transform: translateY(-100%); }
+#topBar.hidden { transform: translateY(-100%); pointer-events: none; }
 
 .top-player { display: flex; align-items: center; gap: 12px; }
 .top-avatar { width: 38px; height: 38px; background: rgba(255,255,255,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 1px solid rgba(255,255,255,0.15); }
@@ -79,7 +79,7 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   display: flex; align-items: center; justify-content: space-around;
   z-index: 100; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
-#bottomNav.hidden { transform: translateY(100%); }
+#bottomNav.hidden { transform: translateY(100%); pointer-events: none; }
 
 .nav-btn {
   background: none; border: none; color: rgba(255,255,255,0.4);
@@ -99,14 +99,51 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   padding: 75px 0 90px; z-index: 90;
   background: #081008; overflow: hidden;
 }
+#lobbyTabs.hidden { display: none !important; }
+
+.hidden { display: none !important; }
 #lobbyTabs::after {
   content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-  background: url('/assets/images/stage_bg_cute.png') no-repeat center center;
-  background-size: cover; filter: blur(15px) brightness(0.4);
-  opacity: 0.6; z-index: -1;
+  background: url('/assets/images/lobby_background_premium.png') no-repeat center center;
+  background-size: cover; filter: blur(4px) brightness(0.6);
+  opacity: 0.9; z-index: -1;
+  animation: bgPulse 8s ease-in-out infinite;
 }
-#lobbyTabs.hidden { display: none; }
-.tab-content { display: none; height: 100%; width: 100%; overflow-y: auto; padding: 24px; position: relative; }
+@keyframes bgPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+#lobbyFirelight {
+  position: absolute; bottom: -100px; left: 50%; width: 600px; height: 600px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(255,160,50,0.2) 0%, transparent 70%);
+  pointer-events: none; z-index: 91;
+  animation: flicker 4s infinite alternate ease-in-out;
+}
+@keyframes flicker {
+  0% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+  33% { opacity: 0.9; transform: translateX(-50.5%) scale(1.05); }
+  66% { opacity: 0.8; transform: translateX(-49.5%) scale(1.02); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+}
+
+#lobbyParticles {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 92;
+}
+#lobbyParticles::before, #lobbyParticles::after {
+  content: ''; position: absolute; bottom: 0; left: 50%; width: 4px; height: 4px;
+  background: #ffcc33; border-radius: 50%;
+  box-shadow: 0 0 10px #ff6600, 100px -150px 0 #ff9900, -80px -250px 0 #ff3300, 40px -400px 0 #ffcc33;
+  opacity: 0; animation: embers 6s infinite ease-in;
+}
+#lobbyParticles::after { animation-delay: 3s; left: 45%; scale: 0.8; }
+
+@keyframes embers {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-600px) scale(0.5); opacity: 0; }
+}
 .tab-content::before {
   content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
   background: radial-gradient(circle at 50% 0%, rgba(255,204,51,0.05) 0%, transparent 70%);
@@ -131,7 +168,10 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   width: min(70vw, 240px); aspect-ratio: 1/1; position: relative;
   animation: floatHero 4.5s ease-in-out infinite;
 }
-#lobbyCapybaraHero img { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 30px 60px rgba(0,0,0,0.6)); }
+#lobbyCapybaraHero img { 
+  width: 100%; height: 100%; object-fit: contain; 
+  filter: drop-shadow(0 20px 40px rgba(0,0,0,0.6));
+}
 @keyframes floatHero { 
   0% { transform: translateY(0) rotate(0) scale(1); filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5)); } 
   50% { transform: translateY(-15px) rotate(1deg) scale(1.02); filter: drop-shadow(0 40px 60px rgba(0,0,0,0.7)); } 
@@ -228,17 +268,37 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   text-shadow: 0 2px 4px rgba(0,0,0,0.5);
 }
 #hpBar {
-  width: 140px; height: 12px;
+  width: 140px; height: 8px;
   background: rgba(255,255,255,0.1);
   border-radius: 6px; overflow: hidden;
   border: 1px solid rgba(255,255,255,0.2);
+  position: relative;
 }
 #hpFill {
   height: 100%; width: 100%;
   background: linear-gradient(90deg, #ff4d6d, #ff88aa);
-  border-radius: 6px;
-  transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transition: width 0.3s;
 }
+
+/* ── Wave Progress ── */
+#waveProgress {
+  position: absolute; top: 10px; left: 0; width: 100%; height: 2px;
+  background: rgba(255,255,255,0.05); border-radius: 1px; overflow: hidden;
+}
+#waveProgressFill { width: 0%; height: 100%; background: #ffcc33; transition: width 0.2s; }
+
+/* ── Boss Health Bar ── */
+#bossBar {
+  position: fixed; top: calc(env(safe-area-inset-top) + 60px); left: 50%;
+  transform: translateX(-50%); width: 85%; max-width: 480px;
+  padding: 6px; background: rgba(0,0,0,0.85);
+  border: 1.5px solid #ff4d6d; border-radius: 8px;
+  z-index: 100; box-shadow: 0 0 20px rgba(255,77,109,0.3);
+}
+#bossBar.hidden { display: none; }
+.boss-label { font-size: 9px; font-weight: 900; color: #ff4d6d; margin-bottom: 2px; letter-spacing: 2px; text-align: center; }
+.boss-hp-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+#bossHpFill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4d6d, #ff9a3c); transition: width 0.3s; }
 #hudRight { display: flex; align-items: center; gap: 12px; }
 #hudBananas { font-weight: 900; color: #ffcc33; font-size: 14px; background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 12px; }
 
@@ -419,15 +479,24 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.05);
 }
 
-/* ── Icon Classes (Future-proofing) ── */
+/* ── Icon Classes (Premium UI) ── */
 .icon {
   display: inline-block;
   width: 1.2em; height: 1.2em;
-  background-size: contain; background-repeat: no-repeat;
+  background-size: 200% 200%; background-repeat: no-repeat;
   vertical-align: middle;
 }
-.icon-gold { background-image: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmZmMzMyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjIsNHY0Yy00LDAtNCw0LTQsNGgzYTEsMSwwLDAsMSwxLDF2OGExLDEsMCwwLDEtMSwxSDNhMSwxLDAsMCwxLTEtMVYxM2ExLDEsMCwwLDEsMS0xaDNjMC00LDAtOCw0LThWNGExLDEsMCwwLDEsMS0xaDhBMSwxLDAsMCwxLDIyLDR6Ii8+PC9zdmc+'); }
-/* More icons will be added here once assets are generated */
+.icon-gold { 
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmZmMzMyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjIsNHY0Yy00LDAtNCw0LTQsNGgzYTEsMSwwLDAsMSwxLDF2OGExLDEsMCwwLDEtMSwxSDNhMSwxLDAsMCwxLTEtMVYxM2ExLDEsMCwwLDEsMS0xaDNjMC00LDAtOCw0LThWNGExLDEsMCwwLDEsMS0xaDhBMSwxLDAsMCwxLDIyLDR6Ii8+PC9zdmc+'); 
+  background-size: contain;
+}
+.icon-shop      { background-image: url('/assets/images/sprites/ui_icons_premium.png'); background-position: 0% 0%; }
+.icon-missions  { background-image: url('/assets/images/sprites/ui_icons_premium.png'); background-position: 100% 0%; }
+.icon-upgrades  { background-image: url('/assets/images/sprites/ui_icons_premium.png'); background-position: 0% 100%; }
+.icon-skills    { background-image: url('/assets/images/sprites/ui_icons_premium.png'); background-position: 100% 100%; }
+
+.icon-home { background-image: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmZmMzMyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkwyIDEySDRWMjJIMTJWMTZIMTRWMjJIMjBWMTJIMjJMMTIgMloiLz48L3N2Zz4='); background-size: contain; }
+.icon-trophy { background-image: url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIGZpbGw9IiNmZmMzMyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTggMnY0YzAsMi0yIDQtNCA0cy00LTItNC00VjJIMTh6TTQgNWMwLTIgMi0yIDItMmg0djJoLTJWMmg0djJoLTJWNWgwYzAtMiAyLTIgMi0yVjNoNHYyYzAsMi0yIDItMiAyaDN2OGMtNCAwLTUtNC01LTRIOHY0Yy00IDAtNS00LTUtNGgzVjV6Ii8+PC9zdmc+'); background-size: contain; }
 
 /* ── Cleanup redundant styles ── */
 .shopItem, .missionItem, .skill-detail-card, .shopItem-left, .missionItem-desc, .skill-detail-top, .shopItem-icon, .skill-detail-icon, .shopItem-name, .skill-detail-name, .shopItem-effect, .skill-detail-stats, .shopItem-btn, .missionItem-btn, .skill-detail-btn {
@@ -463,3 +532,30 @@ body { font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-ser
   opacity: 0; z-index: 14;
 }
 #baseFlash.flash { animation: baseFlashAnim 0.4s ease-out forwards; }
+
+/* ── Level Up Splash ── */
+#levelUpSplash {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px);
+}
+#levelUpSplash.hidden { display: none; }
+.lvl-up-content {
+  text-align: center; color: #fff;
+  animation: levelUpIn 0.8s cubic-bezier(0.17, 0.89, 0.32, 1.28);
+}
+@keyframes levelUpIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.lvl-up-title { font-size: 16px; font-weight: 900; color: #ffcc33; letter-spacing: 4px; margin-bottom: 8px; }
+#lvlUpSkillName { font-size: 32px; font-weight: 900; text-shadow: 0 0 20px rgba(255,204,51,0.6); margin-bottom: 12px; }
+.lvl-up-stars { font-size: 24px; }
+
+/* ── Collect Pulse ── */
+.collect-pulse { animation: collectPulseAnim 0.3s ease-out; }
+@keyframes collectPulseAnim {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); color: #fff; }
+  100% { transform: scale(1); }
+}

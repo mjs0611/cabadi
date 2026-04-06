@@ -108,6 +108,11 @@ const hud               = document.getElementById('hud')!;
 const waveNum           = document.getElementById('waveNum')!;
 const hpFill            = document.getElementById('hpFill')!;
 const hudBananas        = document.getElementById('hudBananas')!;
+const waveProgressFill = document.getElementById('waveProgressFill') as HTMLElement;
+const bossBar          = document.getElementById('bossBar') as HTMLElement;
+const bossHpFill       = document.getElementById('bossHpFill') as HTMLElement;
+const levelUpSplash    = document.getElementById('levelUpSplash') as HTMLElement;
+const lvlUpSkillName   = document.getElementById('lvlUpSkillName') as HTMLElement;
 const hudMissionsBtn    = document.getElementById('hudMissionsBtn')!;
 const soundBtn          = document.getElementById('soundBtn')!;
 
@@ -153,8 +158,8 @@ function updateLobbyStats() {
   
   const lobbyHeroImg = document.querySelector('#lobbyCapybaraHero img') as HTMLImageElement;
   if (lobbyHeroImg) {
-    lobbyHeroImg.src = '/assets/images/intro_hero.png';
-    lobbyHeroImg.style.filter = 'drop-shadow(0 20px 40px rgba(0,0,0,0.4))';
+    lobbyHeroImg.src = '/assets/images/sprites/hero_capybara_v8.png';
+    lobbyHeroImg.style.filter = 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))';
   }
 }
 
@@ -349,14 +354,26 @@ function renderSkillSetting() {
 
 // ── Callbacks ────────────────────────────────────────────────────────────────
 function onHpChange(hp: number, maxHp: number) { updateHpBar(hp, maxHp); sound.baseHit(); }
-function onBananaEarned() { hudBananas.innerHTML = `<span class="icon icon-gold"></span> ${state.sessionBananas}`; }
+function onBananaEarned() { 
+  hudBananas.innerHTML = `<span class="icon icon-gold"></span> ${state.sessionBananas}`; 
+  hudBananas.classList.remove('collect-pulse');
+  void hudBananas.offsetWidth;
+  hudBananas.classList.add('collect-pulse');
+}
 function onKill(isBoss: boolean) {
   updateMissionProgress(userHash, 'kills', 1);
   updateMissionProgress(userHash, 'session_bananas', state.sessionBananas);
-  if (isBoss) updateMissionProgress(userHash, 'bosses', 1);
+  if (isBoss) {
+    updateMissionProgress(userHash, 'bosses', 1);
+    bossBar.classList.add('hidden');
+  }
+  updateWaveProgress();
 }
 function onBaseFlash() { baseFlash.classList.remove('flash'); void baseFlash.offsetWidth; baseFlash.classList.add('flash'); }
-function onBossSpawn(_e: any) {}
+function onBossSpawn(e: any) {
+  bossBar.classList.remove('hidden');
+  updateBossHpLoop(e);
+}
 function onWaveClear() {
   state.phase = 'upgrade';
   updateMissionProgress(userHash, 'waves', 1);
@@ -389,7 +406,47 @@ function updateSkillSlots() {
     container.appendChild(slot);
   }
 }
-function showWaveAnnounce(w: number) { waveAnnounce.classList.remove('show'); void waveAnnounce.offsetWidth; waveAnnounce.textContent = `WAVE ${w}`; waveAnnounce.classList.add('show'); }
+function showWaveAnnounce(w: number) { 
+  waveAnnounce.classList.remove('show'); 
+  void waveAnnounce.offsetWidth; 
+  
+  let areaName = "Deep Jungle";
+  if (w > 20) areaName = "Ancient Ruins";
+  else if (w > 10) areaName = "Golden Oasis";
+  
+  waveAnnounce.style.whiteSpace = 'pre-wrap';
+  waveAnnounce.innerHTML = `Area ${areaName}\nWAVE ${w}`; 
+  waveAnnounce.classList.add('show'); 
+  
+  updateWaveProgress(0); 
+}
+
+function updateWaveProgress(forced?: number) {
+  if (!waveProgressFill) return;
+  if (forced !== undefined) {
+    waveProgressFill.style.width = `${forced}%`;
+    return;
+  }
+  const total = 5 + state.wave * 3;
+  const killed = total - (game as any).enemiesLeft - (game as any).enemies.length;
+  waveProgressFill.style.width = `${Math.min(100, (killed / total) * 100)}%`;
+}
+
+function updateBossHpLoop(boss: any) {
+  if (!boss || boss.dead || state.phase !== 'playing') {
+    bossBar.classList.add('hidden');
+    return;
+  }
+  const pct = Math.max(0, (boss.hp / boss.maxHp) * 100);
+  bossHpFill.style.width = `${pct}%`;
+  requestAnimationFrame(() => updateBossHpLoop(boss));
+}
+
+function showLevelUpSplash(skillType: string) {
+  levelUpSplash.classList.remove('hidden');
+  lvlUpSkillName.textContent = skillType.replace('_', ' ').toUpperCase();
+  setTimeout(() => levelUpSplash.classList.add('hidden'), 1500);
+}
 
 function showUpgradeScreen() {
   const upgrades = pickUpgrades(state, 3);
@@ -415,6 +472,9 @@ function showUpgradeScreen() {
     card.addEventListener('click', () => {
       u.apply(state);
       upgradeScreen.classList.remove('show');
+      if (u.type === 'skill_up' && u.skillType) {
+        showLevelUpSplash(u.skillType);
+      }
       state.phase = 'playing';
       waveNum.textContent = String(state.wave);
       updateHpBar(state.hp, state.maxHp);

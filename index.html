@@ -60,11 +60,13 @@
 
 <!-- Tab Screens -->
 <div id="lobbyTabs" class="hidden">
+  <div id="lobbyFirelight"></div>
+  <div id="lobbyParticles"></div>
   <!-- Home Tab -->
   <div id="tab-home" class="tab-content active">
     <div class="lobby-center-v3">
       <div id="lobbyCapybaraHero">
-        <img src="/assets/images/intro_hero.png" alt="Hero Capy">
+        <img src="/assets/images/sprites/hero_capybara_v8.png" alt="Hero Capy">
       </div>
       <div class="lobby-welcome">반가워요, 생존자님!</div>
       <button id="lobbyAdBuffBtn" class="buff-btn-v3">📺 공격력 버프 (+30%)</button>
@@ -101,6 +103,11 @@
 <div id="hud">
   <div id="waveLabel">WAVE <span id="waveNum">1</span></div>
   <div id="hpBar"><div id="hpFill"></div></div>
+  <div id="waveProgress"><div id="waveProgressFill"></div></div>
+  <div id="bossBar" class="hidden">
+    <div class="boss-label">BOSS INCOMING</div>
+    <div class="boss-hp-bg"><div id="bossHpFill"></div></div>
+  </div>
   <div id="skillSlots"></div>
   <div id="hudRight">
     <div id="hudBananas"><span class="icon icon-gold"></span> 0</div>
@@ -114,6 +121,15 @@
 
 <!-- Base Flash -->
 <div id="baseFlash"></div>
+
+<!-- Level Up Splash -->
+<div id="levelUpSplash" class="hidden">
+  <div class="lvl-up-content">
+    <div class="lvl-up-title">SKILL UPGRADE!</div>
+    <div id="lvlUpSkillName">ACORN CANNON</div>
+    <div class="lvl-up-stars">⭐⭐⭐</div>
+  </div>
+</div>
 
 <!-- Wave Upgrade Screen -->
 <div id="upgradeScreen">

@@ -1,7 +1,7 @@
 import type { GameState } from './state.ts';
 import {
   type Enemy, type Bullet, type Particle, type FloatingText, type PalmDrop,
-  createEnemy, createBullet, createParticle, createFloatingText,
+  createEnemy, createBullet, createParticle, createFloatingText, createGoldParticle
 } from './entities.ts';
 import { render } from './renderer.ts';
 import { getSkillStats } from './data.ts';
@@ -40,6 +40,7 @@ export class Game {
 
   private paused = false;
   private reviveUsed = false;
+  private hitStopTicks = 0; // For high-feedback combat
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -146,7 +147,15 @@ export class Game {
     if (this.state.phase !== 'playing') return;
     const dt = Math.min(now - this.lastTime, 50);
     this.lastTime = now;
-    this.update(now, dt);
+    
+    if (this.hitStopTicks > 0) {
+      this.hitStopTicks--;
+      // We still draw current frame so UI/VFX animations aren't frozen, 
+      // but we don't update positions.
+    } else {
+      this.update(now, dt);
+    }
+    
     this.draw();
     this.rafId = requestAnimationFrame(this.loop);
   };
@@ -181,6 +190,7 @@ export class Game {
         e.status.slowed.msLeft -= dt;
         if (e.status.slowed.msLeft <= 0) delete e.status.slowed;
       }
+      if (e.flashTicks > 0) e.flashTicks--;
 
       const dx = cx - e.x, dy = cy - e.y;
       const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -288,6 +298,9 @@ export class Game {
             this.floatingTexts.push(createFloatingText(e.x, e.y - 20, 'CRIT!', '#ff0055'));
           }
           e.hp -= finalDmg;
+          e.flashTicks = 3;
+          this.hitStopTicks = e.hp <= 0 ? 5 : 2;
+
           // VFX: Impact Spark (0)
           this.particles.push(...createParticle(b.x, b.y, b.color, 4, 0));
           this.floatingTexts.push(createFloatingText(e.x, e.y, `-${Math.round(finalDmg)}`, isCrit ? '#ff0055' : '#ff9a3c'));
@@ -302,6 +315,11 @@ export class Game {
 
     // Effect cleanup
     this.particles.forEach(p => { 
+      if (p.isGold && p.life > 70) {
+          // Check if collected
+          p.life = p.maxLife; // Kill it
+          return;
+      }
       p.x += p.vx; p.y += p.vy; 
       p.vy += 0.05; 
       p.life++; 
@@ -329,14 +347,28 @@ export class Game {
     this.state.score++;
     // VFX: Water/Soul Splash (5)
     this.particles.push(...createParticle(e.x, e.y, '#ffffff', 12, 5));
+    
+    // JUICE: Gold Flying to HUD
+    const amount = Math.max(1, Math.round(e.gold * this.state.bananaMultiplier));
+    const targetX = this.canvas.width - 40; // Approx Hud Banana icon
+    const targetY = 30;
+    for (let i = 0; i < Math.min(amount, 8); i++) {
+        const gp = {
+            ...createGoldParticle(e.x, e.y, targetX, targetY),
+            life: -i * 5 // stagger the fly-in
+        };
+        this.particles.push(gp);
+    }
+
     sound.enemyDie();
-    const earned = Math.max(1, Math.round(e.gold * this.state.bananaMultiplier));
+    const earned = amount;
     this.state.sessionBananas += earned;
     this.floatingTexts.push(createFloatingText(e.x, e.y - 20, `+${earned}🍌`, '#ffcc33'));
     
     // Life Steal
     if (Math.random() < this.state.lifeStealChance) {
       this.state.hp = Math.min(this.state.maxHp, this.state.hp + 1);
+      this.hitStopTicks = 6;
       this.particles.push(...createParticle(this.canvas.width/2, this.canvas.height/2, '#ff4d6d', 4)); 
     }
 

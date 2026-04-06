@@ -16,6 +16,7 @@ export interface Enemy {
     poisoned?: { dps: number; msLeft: number };
     slowed?: { factor: number; msLeft: number };
   };
+  flashTicks: number; // For hit-flash VFX
 }
 
 export interface Bullet {
@@ -62,6 +63,9 @@ export interface Particle {
   vfxIdx?: number;
   rotation?: number;
   stretch?: number;
+  isGold?: boolean;  // For HUD collection animation
+  targetX?: number;
+  targetY?: number;
 }
 
 export interface FloatingText {
@@ -96,9 +100,10 @@ export function createEnemy(canvasW: number, canvasH: number, wave: number): Ene
     gold: data.gold,
     dead: false,
     isBoss: data.isBoss,
-    tier: data.tier, // We need to ensure data.tier exists
-    idx: data.idx || 0, // We need to ensure data.idx exists
-    status: {}
+    tier: data.tier, 
+    idx: data.idx || 0,
+    status: {},
+    flashTicks: 0
   };
 }
 
@@ -132,4 +137,12 @@ export function createParticle(x: number, y: number, color: string, count = 6, v
       vfxIdx
     };
   });
+}
+
+export function createGoldParticle(x: number, y: number, targetX: number, targetY: number): Particle {
+  return {
+    x, y, vx: (Math.random()-0.5)*10, vy: -5 - Math.random()*10,
+    radius: 6, alpha: 1, color: '#ffcc33', life: 0, maxLife: 100,
+    isGold: true, targetX, targetY
+  };
 }

@@ -25,7 +25,19 @@ const MONSTER_SHEETS = {
 const UI_SHEET   = SPRITE_DIR + 'ui_decor_sheet.png';
 const VFX_SHEET  = SPRITE_DIR + 'vfx_combat_sheet.png';
 const CAPYBARA   = SPRITE_DIR + 'capybara_main_sprite_1775313079058.png';
-const STAGE_BG   = '/assets/images/stage_bg_cute.png';
+const MONSTER_PREM_1 = SPRITE_DIR + 'monster_premium_tier1.png';
+
+const THEMES: Record<string, { bg: string; overlay: string; decor: string }> = {
+  jungle: { bg: '/assets/images/stage_bg_cute.png', overlay: 'rgba(0,0,5,0.6)', decor: 'jungle' },
+  oasis:  { bg: '/assets/images/stage_bg_oasis.png', overlay: 'rgba(50,30,0,0.5)', decor: 'oasis' },
+  ruins:  { bg: '/assets/images/stage_bg_ruins.png', overlay: 'rgba(10,20,30,0.6)', decor: 'ruins' }
+};
+
+function getTheme(wave: number) {
+  if (wave <= 10) return THEMES.jungle;
+  if (wave <= 20) return THEMES.oasis;
+  return THEMES.ruins;
+}
 
 const imageCache: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
 const processing: Record<string, boolean> = {};
@@ -133,23 +145,25 @@ export function render(
   const cx = w / 2, cy = h / 2;
   const canvasW = w;
 
-  // 1. Background
-  const bgImg = getImg(STAGE_BG);
+  // 1. Background (Theme-Based)
+  const theme = getTheme(state.wave);
+  const bgImg = getImg(theme.bg);
   const isBGLoaded = bgImg instanceof HTMLCanvasElement || (bgImg instanceof HTMLImageElement && bgImg.complete);
   if (isBGLoaded) {
+    // Fill the whole canvas with the high-res BG (tiled if needed)
     const pat = ctx.createPattern(bgImg as CanvasImageSource, 'repeat');
     if (pat) {
       ctx.fillStyle = pat;
       ctx.fillRect(0, 0, w, h);
     }
   } else {
-    ctx.fillStyle = '#102015'; // Dark jungle fallback
+    ctx.fillStyle = '#102015'; 
     ctx.fillRect(0, 0, w, h);
   }
-  // Stronger overlay to darken the background for better contrast with monsters
-  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  // Darken overlay specialized per theme
+  ctx.fillStyle = theme.overlay;
   ctx.fillRect(0, 0, w, h);
-  drawBackgroundDecor(ctx, w, h, state.wave);
+  drawBackgroundDecor(ctx, w, h, state.wave, theme.decor);
 
   // 2. Base Platform (Index 2 in 3x3 UI sheet is the Platform)
   drawUI(ctx, cx, cy, 2, 80);
@@ -248,6 +262,9 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, canvasW: number) {
   if (e.isBoss) {
     sheet = MONSTER_SHEETS.boss;
     idx = e.type.includes('caiman') ? 0 : e.type.includes('jaguar') ? 1 : e.type.includes('anaconda') ? 2 : 3;
+  } else if (e.type === 'poison_frog' || e.type === 'toucan' || e.type === 'turtle') {
+    sheet = MONSTER_PREM_1;
+    idx = e.type === 'poison_frog' ? 0 : e.type === 'toucan' ? 1 : 2;
   } else if (e.radius > 20) {
     sheet = e.hp > 1000 ? MONSTER_SHEETS.elite : MONSTER_SHEETS.intermediate;
     idx = (e.type.length) % 4;
@@ -260,7 +277,10 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, canvasW: number) {
   if (isLoaded) {
     let sx = 0, sy = 0, sw = img.width, sh = img.height;
 
-    if (e.tier === 'normal') {
+    if (sheet === MONSTER_PREM_1) {
+      sw = img.width / 3; sh = img.height; 
+      sx = idx * sw; sy = 0;
+    } else if (e.tier === 'normal') {
       sw = img.width / 4; sh = img.height / 4;
       sx = (idx % 4) * sw; sy = Math.floor(idx / 4) * sh;
     } else if (e.isBoss) {
@@ -283,11 +303,17 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, canvasW: number) {
     const walkBounce = isWalking ? Math.abs(Math.sin(Date.now() / (100 - walkSpeed/2) + timeOffset)) * (e.radius * 0.25) : 0;
 
     ctx.save();
-    ctx.translate(e.x, e.y - walkBounce);
-    ctx.rotate(walkWiggle);
     ctx.scale(e.x > canvasW / 2 ? 1 : -1, 1);
     
     ctx.drawImage(img, finalSX, finalSY, finalSW, finalSH, -drawRadius, -drawRadius, drawRadius * 2, drawRadius * 2);
+
+    if (e.flashTicks > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'source-in';
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillRect(-drawRadius, -drawRadius, drawRadius * 2, drawRadius * 2);
+      ctx.restore();
+    }
     ctx.restore();
   } else {
     ctx.fillStyle = e.isBoss ? '#ffcc33' : '#ff4d6d';
@@ -365,6 +391,27 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle) {
   if (p.rotation !== undefined) ctx.rotate(p.rotation);
   if (p.stretch !== undefined) ctx.scale(1, p.stretch);
   
+  if (p.isGold && p.targetX !== undefined && p.targetY !== undefined) {
+    // Collect animation: home toward target
+    const dx = p.targetX - p.x;
+    const dy = p.targetY - p.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+    const speed = 15;
+    p.vx += (dx/dist * speed - p.vx) * 0.15;
+    p.vy += (dy/dist * speed - p.vy) * 0.15;
+    
+    ctx.globalAlpha = p.alpha;
+    ctx.fillStyle = '#ffcc33';
+    ctx.beginPath();
+    ctx.arc(0, 0, p.radius * (1 + Math.sin(p.life*0.5)*0.3), 0, Math.PI * 2);
+    ctx.fill();
+    // Add a small glint
+    ctx.fillStyle = '#fff9d8';
+    ctx.beginPath(); ctx.arc(-p.radius/3, -p.radius/3, p.radius/3, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    return;
+  }
+  
   if (p.vfxIdx !== undefined) {
     const img = getImg(VFX_SHEET);
     const isLoaded = img instanceof HTMLCanvasElement || (img instanceof HTMLImageElement && img.complete);
@@ -393,29 +440,35 @@ function drawFloatingText(ctx: CanvasRenderingContext2D, ft: FloatingText) {
   ctx.globalAlpha = 1;
 }
 
-function drawBackgroundDecor(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number) {
+function drawBackgroundDecor(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number, style: string) {
   const now = Date.now();
   
   // Floating motes/stars
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
+  ctx.fillStyle = style === 'oasis' ? 'rgba(255,200,50,0.15)' : 'rgba(255,255,255,0.05)';
   for (let i = 0; i < 30; i++) {
     const timeOffset = (now / 3000) * (i % 2 === 0 ? 1 : -1);
     const x = ((Math.sin(i * 123.45 + seed) * 0.5 + 0.5 + timeOffset) * w) % w;
     const y = ((Math.cos(i * 678.90 + seed) * 0.5 + 0.5 + timeOffset * 0.5) * h) % h;
-    const s = Math.abs(Math.sin(now / 1000 + i)) * 2 + 1;
+    const s = Math.abs(Math.sin(now / 1000 + i)) * (style === 'ruins' ? 4 : 2) + 1;
     ctx.beginPath(); ctx.arc(x >= 0 ? x : x + w, y >= 0 ? y : y + h, s, 0, Math.PI * 2); ctx.fill();
   }
 
-  // Jungle Vines/Foliage silhouettes
-  ctx.fillStyle = 'rgba(0, 20, 10, 0.3)';
-  for (let i = 0; i < 6; i++) {
-    const x = (i / 6) * w;
-    const h2 = 100 + Math.sin(now / 2000 + i) * 20;
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.quadraticCurveTo(x + 20, h2 / 2, x, h2);
-    ctx.lineTo(x - 5, h2);
-    ctx.lineTo(x - 5, 0);
-    ctx.fill();
+  // Theme-specific silhouettes
+  if (style === 'jungle') {
+    ctx.fillStyle = 'rgba(0, 20, 10, 0.3)';
+    for (let i = 0; i < 6; i++) {
+      const x = (i / 6) * w;
+      const h2 = 100 + Math.sin(now / 2000 + i) * 20;
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.quadraticCurveTo(x + 20, h2 / 2, x, h2); ctx.lineTo(x - 5, h2); ctx.lineTo(x - 5, 0); ctx.fill();
+    }
+  } else if (style === 'oasis') {
+    ctx.fillStyle = 'rgba(255, 180, 0, 0.1)';
+    for (let i = 0; i < 4; i++) {
+       const x = ((i * 300 + now/50) % (w + 200)) - 100;
+       ctx.beginPath(); ctx.arc(x, h * 0.8, 150, 0, Math.PI * 2); ctx.fill();
+    }
+  } else if (style === 'ruins') {
+    ctx.fillStyle = 'rgba(100, 100, 130, 0.2)';
+    ctx.fillRect(0, 0, w, 40); ctx.fillRect(0, h - 40, w, 40);
   }
 }
