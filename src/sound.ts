@@ -34,6 +34,15 @@ class SoundManager {
     if (this._enabled) this.ctx?.resume().catch(() => {});
   }
 
+  // AIT 전용: 배경 전환 및 광고 시 전체 사운드 제어
+  pauseAll() {
+    this.suspend();
+  }
+
+  resumeAll() {
+    this.resume();
+  }
+
   // 스킬별 발사음
   playSkillSound(type: string) {
     const ctx = this.getCtx(); if (!ctx) return;

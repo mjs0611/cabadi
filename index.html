@@ -5,6 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>카바디</title>
   <link rel="stylesheet" href="/src/style.css">
+  <style>
+    .intro-hero { 
+      display: flex; justify-content: center; align-items: center;
+      width: min(80vw, 360px);
+      margin-bottom: 20px;
+      position: relative;
+      animation: floatHero 4s ease-in-out infinite; z-index: 2;
+    }
+    .intro-hero::after {
+      content: ''; position: absolute; width: 100%; height: 100%;
+      background: radial-gradient(circle, rgba(255,204,51,0.3) 0%, transparent 70%);
+      filter: blur(20px); z-index: -1; opacity: 0.6;
+    }
+    .intro-hero img { 
+      width: 100%; height: auto; 
+      filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5)); 
+    }
+  </style>
 </head>
 <body>
 
@@ -13,11 +31,11 @@
 <!-- Intro -->
 <div id="intro">
   <div class="intro-hero">
-    <img src="/assets/images/intro_hero.png" alt="Cabadi Hero">
+    <img src="/assets/images/sprites/hero_v5.png" alt="카바디">
   </div>
   <div id="gameTitle">카바디</div>
   <div id="gameSub">카피바라 디펜스</div>
-  <button id="startBtn" class="pulse-btn">TAP TO START</button>
+  <button id="startBtn" class="pulse-btn">터치하여 시작</button>
 </div>
 
 <!-- Persistent Bars (Lobby Only) -->
@@ -25,13 +43,14 @@
   <div class="top-player">
     <div class="top-avatar">🐾</div>
     <div class="top-name-box">
-      <div class="top-name">CAPY SURVIVOR</div>
+      <div class="top-name">카피 생존자</div>
       <div class="top-level">Lv.1</div>
     </div>
   </div>
   <div class="top-stats">
     <div class="top-stat-item"><span class="icon icon-gold"></span> <span id="lobbyBananaCountTop">0</span></div>
     <div class="top-stat-item"><span class="icon icon-trophy">🏆</span> <span id="lobbyBestWaveTop">1</span></div>
+    <button id="cheatBananaBtn" style="background:rgba(255,255,255,0.1); border:none; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; margin-left:8px;">치트 +5000</button>
   </div>
 </div>
 
@@ -50,11 +69,11 @@
   </button>
   <button class="nav-btn" data-tab="upgrades">
     <div class="nav-icon"><span class="icon icon-upgrades">📈</span></div>
-    <div class="nav-label">강화</div>
+    <div class="nav-label">성장</div>
   </button>
   <button class="nav-btn" data-tab="skills">
     <div class="nav-icon"><span class="icon icon-skills">🌱</span></div>
-    <div class="nav-label">스킬</div>
+    <div class="nav-label">도감</div>
   </button>
 </nav>
 
@@ -66,46 +85,56 @@
   <div id="tab-home" class="tab-content active">
     <div class="lobby-center-v3">
       <div id="lobbyCapybaraHero">
-        <img src="/assets/images/sprites/hero_capybara_v8.png" alt="Hero Capy">
+        <img src="/assets/images/sprites/hero_v5.png" alt="내 캐릭터">
       </div>
       <div class="lobby-welcome">반가워요, 생존자님!</div>
       <button id="lobbyAdBuffBtn" class="buff-btn-v3">📺 공격력 버프 (+30%)</button>
-      <button id="lobbyBattleBtn" class="battle-btn-v3">전투 개시</button>
+      <button id="lobbyBattleBtn" class="battle-btn-v3">탐험 시작</button>
     </div>
   </div>
 
-  <!-- Shop Tab (Moved from overlay) -->
+  <!-- Shop Tab -->
   <div id="tab-shop" class="tab-content">
-    <div class="tab-header">카바디 상점</div>
-    <div id="shopItems" class="grid-list"></div>
+    <div class="shop-header">
+      <h2 class="shop-title">캡슐 상점</h2>
+      <div id="lucky-draw-card" class="lucky-draw-card">
+        <div class="draw-img">📦</div>
+        <div class="draw-info">
+          <h3>행운의 캡슐</h3>
+          <p>새로운 동료를 영입하세요!</p>
+        </div>
+        <button id="drawCapsuleBtn" class="draw-btn">1,500 🍌</button>
+      </div>
+    </div>
+    <div id="shopItems"></div>
   </div>
 
-  <!-- Missions Tab (Moved from overlay) -->
+  <!-- Missions Tab -->
   <div id="tab-missions" class="tab-content">
-    <div class="tab-header">일일 미션</div>
-    <div id="missionsItems" class="grid-list"></div>
+    <div class="tab-header">일일 수행 과제</div>
+    <div id="missionsItems"></div>
   </div>
 
-  <!-- Upgrades Tab (Was Shop renamed to Upgrades/Enhance) -->
+  <!-- Upgrades Tab -->
   <div id="tab-upgrades" class="tab-content">
-    <div class="tab-header">능력 강화</div>
-    <div id="upgradesItems" class="grid-list"></div>
+    <div class="tab-header">기본 능력 강화</div>
+    <div id="upgradesItems"></div>
   </div>
 
-  <!-- Skills Tab (Moved from overlay) -->
+  <!-- Skills Tab -->
   <div id="tab-skills" class="tab-content">
     <div class="tab-header">스킬 도감</div>
-    <div id="skillSettingList" class="grid-list"></div>
+    <div id="skillSettingList"></div>
   </div>
 </div>
 
 <!-- HUD -->
 <div id="hud">
-  <div id="waveLabel">WAVE <span id="waveNum">1</span></div>
+  <div id="waveLabel">웨이브 <span id="waveNum">1</span></div>
   <div id="hpBar"><div id="hpFill"></div></div>
   <div id="waveProgress"><div id="waveProgressFill"></div></div>
   <div id="bossBar" class="hidden">
-    <div class="boss-label">BOSS INCOMING</div>
+    <div class="boss-label">보스 출현!</div>
     <div class="boss-hp-bg"><div id="bossHpFill"></div></div>
   </div>
   <div id="skillSlots"></div>
@@ -125,57 +154,70 @@
 <!-- Level Up Splash -->
 <div id="levelUpSplash" class="hidden">
   <div class="lvl-up-content">
-    <div class="lvl-up-title">SKILL UPGRADE!</div>
-    <div id="lvlUpSkillName">ACORN CANNON</div>
+    <div class="lvl-up-title">스킬 강화!</div>
+    <div id="lvlUpSkillName">도토리 캐논</div>
     <div class="lvl-up-stars">⭐⭐⭐</div>
   </div>
 </div>
 
 <!-- Wave Upgrade Screen -->
 <div id="upgradeScreen">
-  <div id="upgradeTitle">강화 선택</div>
+  <div id="upgradeTitle">능력 선택</div>
   <div id="upgradeCards"></div>
 </div>
 
 <!-- Game Over -->
 <div id="gameOver">
-  <div id="goLabel">GAME OVER</div>
+  <div id="goLabel">탐험 종료</div>
   
   <div class="go-results-grid">
     <div class="res-card">
-      <span class="res-label">SURVIVED</span>
+      <span class="res-label">생존 기록</span>
       <span id="goScore" class="res-val">0</span>
       <span class="res-unit">WAVES</span>
     </div>
     <div class="res-card">
-      <span class="res-label">EARNED</span>
+      <span class="res-label">획득 바나나</span>
       <span id="goBananaEarned" class="res-val">+0</span>
-      <span class="res-unit">BANANAS</span>
+      <span class="res-unit">개</span>
     </div>
   </div>
 
   <div id="goBest" class="go-record">최고 기록 0 WAVES</div>
 
   <div class="go-actions-grid">
-    <button class="go-btn-v2 ad" id="reviveBtn">📺 부활</button>
+    <button class="go-btn-v2 ad" id="reviveBtn">📺 부활하기</button>
     <button class="go-btn-v2 ad" id="doubleBananaBtn">📺 보상 2배</button>
     <button class="go-btn-v2 primary" id="retryBtn">다시 시작</button>
     <button class="go-btn-v2 secondary" id="goLobbyBtn">로비로</button>
   </div>
 </div>
 
-
-
-<!-- Ad Fallback (AIT/AdMob 미지원 환경) -->
+<!-- Ad Fallback -->
 <div id="adScreen">
-  <div id="adTag">ADVERTISEMENT</div>
+  <div id="adTag">광고 상영 중</div>
   <div id="adBox"><div id="adCount">5</div></div>
+</div>
+
+<!-- Draw Result Modal -->
+<div id="drawResultModal" class="modal-overlay hidden">
+  <div class="draw-result-container">
+    <div id="drawCapsule" class="draw-capsule">🎁</div>
+    <div id="drawContent" class="draw-content hidden">
+      <div id="drawRarity" class="draw-rarity">전설</div>
+      <div id="drawIcon" class="draw-icon">🐾</div>
+      <h2 id="drawName" class="draw-name">사이버 카피바라</h2>
+      <p id="drawDesc" class="draw-desc">정밀한 레이저 사격이 가능합니다.</p>
+      <div id="drawCompensation" class="draw-comp hidden">+500 🍌 (중복 보상)</div>
+      <button id="closeDrawBtn" class="ui-button primary">확인</button>
+    </div>
+  </div>
 </div>
 
 <!-- Close confirmation -->
 <div id="closeConfirm">
   <div id="closeBox">
-    <div id="closeMsg">게임을 종료할까요?</div>
+    <div id="closeMsg">게임을 종료하시겠습니까?</div>
     <div class="closeBtns">
       <button id="closeNo">계속하기</button>
       <button id="closeYes">종료</button>

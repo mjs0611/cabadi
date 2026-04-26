@@ -31,6 +31,7 @@ export interface GameState {
   // 메타 정보
   unlockedSkills: string[];
   startingSkillId: string;
+  selectedCapyType: string;
 }
 
 const EXTRA_START_SKILLS = ['poison_thorn', 'coconut_bomb', 'mango_laser', 'tropical_lightning'];
@@ -71,5 +72,6 @@ export function createInitialState(upgrades: CapyUpgrades): GameState {
     sessionBananas: 0,
     unlockedSkills,
     startingSkillId,
+    selectedCapyType: upgrades.selectedCapyType,
   };
 }

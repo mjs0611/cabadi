@@ -6,6 +6,7 @@ import {
 import { render } from './renderer.ts';
 import { getSkillStats } from './data.ts';
 import { sound } from './sound.ts';
+import { CAPY_TYPES } from './capy_types.ts';
 
 function enemiesForWave(wave: number) { return 5 + wave * 3; }
 
@@ -307,6 +308,7 @@ export class Game {
           sound.monsterHit();
           if (b.hasExplosion) this.explode(b.x, b.y, finalDmg * 0.5, 80);
           this.applySkillEffect(b.originType, e);
+          this.applyCharacterPassive(e, b);
           if (e.hp <= 0) { e.dead = true; this.killEnemy(e); }
           if (b.pierce <= 0) { b.dead = true; break; } else { b.pierce--; }
         }
@@ -411,10 +413,41 @@ export class Game {
       });
   }
 
+  private applyCharacterPassive(target: Enemy, b: Bullet) {
+    const capy = CAPY_TYPES.find(c => c.id === this.state.selectedCapyType);
+    if (!capy || !capy.specialAbility) return;
+
+    if (capy.specialAbility === 'knockback') {
+      const dx = target.x - (this.canvas.width/2);
+      const dy = target.y - (this.canvas.height/2);
+      const len = Math.sqrt(dx*dx + dy*dy) || 1;
+      target.x += (dx/len) * 30;
+      target.y += (dy/len) * 30;
+      this.particles.push(...createParticle(target.x, target.y, '#ffffff', 4, 0));
+    }
+    if (capy.specialAbility === 'magic_blast' && Math.random() < 0.2) {
+      this.explode(target.x, target.y, b.damage * 0.4, 60);
+      this.particles.push(...createParticle(target.x, target.y, '#d666ff', 8, 1));
+      this.floatingTexts.push(createFloatingText(target.x, target.y - 30, 'MAGIC!', '#d666ff'));
+    }
+    if (capy.specialAbility === 'holy_stun' && Math.random() < 0.15) {
+      target.status.slowed = { factor: 0, msLeft: 1000 };
+      this.particles.push(...createParticle(target.x, target.y, '#ffffaa', 10, 4));
+      this.floatingTexts.push(createFloatingText(target.x, target.y - 30, 'STUN!', '#ffff00'));
+    }
+    if (capy.specialAbility === 'nature_grasp' && Math.random() < 0.1) {
+       target.status.slowed = { factor: 0.1, msLeft: 3000 };
+       this.particles.push(...createParticle(target.x, target.y, '#2ecc71', 6, 2));
+       this.floatingTexts.push(createFloatingText(target.x, target.y - 30, 'ROOT!', '#2ecc71'));
+    }
+  }
+
   private shoot(cx: number, cy: number, tx: number, ty: number, type: string, stats: any) {
+    const capy = CAPY_TYPES.find(c => c.id === this.state.selectedCapyType);
     const count = stats.count || 1;
     const speed = stats.speed ? stats.speed / 50 : 5;
     const damage = (stats.damage || 10) * this.state.damageMultiplier;
+    
     sound.playSkillSound(type);
     if (type === 'palm_fall') {
       const cands = this.enemies.filter(e => !e.dead);
@@ -427,14 +460,20 @@ export class Game {
     const angle = Math.atan2(ty - cy, tx - cx);
     const pierce = stats.pierce || 0;
     const hasExplo = !!stats.radius || !!stats.explosive;
-    const color = type === 'acorn_cannon' ? '#ffcc33' : type === 'poison_thorn' ? '#aaff00' : type === 'coconut_bomb' ? '#885522' : type === 'mango_laser' ? '#ffaa00' : type === 'homing_seed' ? '#88ff44' : '#ffffff';
+
+    // Use character-specific color if available
+    let color = capy?.projectileColor || (type === 'acorn_cannon' ? '#ffcc33' : type === 'poison_thorn' ? '#aaff00' : type === 'coconut_bomb' ? '#885522' : type === 'mango_laser' ? '#ffaa00' : type === 'homing_seed' ? '#88ff44' : '#ffffff');
+    if (capy?.specialAbility === 'banana_master') color = '#ffd700'; // Gold bullet for rich capy
+    
+    const scale = capy?.projectileScale || 1;
+    const isCyber = capy?.specialAbility === 'laser_aim';
+
     const spread = 0.2;
     for(let i=0; i<count; i++) {
       const a = angle + (i - (count-1)/2)*spread;
       const btx = cx + Math.cos(a)*100, bty = cy + Math.sin(a)*100;
-      const bullet = createBullet(cx, cy, btx, bty, speed, damage, pierce, hasExplo, type, color);
+      const bullet = createBullet(cx, cy, btx, bty, speed, damage, pierce, hasExplo, type, color, scale);
       
-      // Level-based VFX assignments
       const skill = this.state.activeSkills.find(s => s.type === type);
       const lv = skill?.level ?? 1;
 
@@ -445,10 +484,9 @@ export class Game {
         if (lv >= 4) bullet.pulse = 1;
       }
 
-      if (type === 'homing_seed') bullet.isHoming = true;
+      if (type === 'homing_seed' || isCyber) bullet.isHoming = true;
       this.bullets.push(bullet);
       
-      // Level 10 screen shake for strong skills
       if (lv === 10 && (type === 'acorn_cannon' || type === 'coconut_bomb' || type === 'palm_fall')) {
         this.applyScreenShake(10, 200);
       }

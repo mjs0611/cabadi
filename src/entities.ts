@@ -35,10 +35,10 @@ export interface Bullet {
   color: string;
   isHoming?: boolean;
   homingTarget?: Enemy | null;
-  // VFX
+  pulse?: number;
+  scale?: number;
   rotation?: number;
   stretch?: number;
-  pulse?: number;
 }
 
 export interface PalmDrop {
@@ -107,18 +107,18 @@ export function createEnemy(canvasW: number, canvasH: number, wave: number): Ene
   };
 }
 
-export function createBullet(fromX: number, fromY: number, toX: number, toY: number, speed: number, damage: number, pierce: number, hasExplosion: boolean, type: string, color = '#fff'): Bullet {
+export function createBullet(fromX: number, fromY: number, toX: number, toY: number, speed: number, damage: number, pierce: number, hasExplosion: boolean, type: string, color = '#fff', scale = 1): Bullet {
   const dx = toX - fromX, dy = toY - fromY;
   const len = Math.sqrt(dx*dx + dy*dy) || 1;
   return {
     type, originType: type,
     x: fromX, y: fromY,
     vx: (dx/len)*speed, vy: (dy/len)*speed,
-    radius: 8,
+    radius: 8 * scale,
     damage, pierce,
     hitEnemies: new Set(),
     dead: false,
-    hasExplosion, color
+    hasExplosion, color, scale
   };
 }
 
@@ -140,9 +140,11 @@ export function createParticle(x: number, y: number, color: string, count = 6, v
 }
 
 export function createGoldParticle(x: number, y: number, targetX: number, targetY: number): Particle {
+  const angle = Math.random() * Math.PI * 2;
+  const burstSpeed = 8 + Math.random() * 8;
   return {
-    x, y, vx: (Math.random()-0.5)*10, vy: -5 - Math.random()*10,
-    radius: 6, alpha: 1, color: '#ffcc33', life: 0, maxLife: 100,
+    x, y, vx: Math.cos(angle) * burstSpeed, vy: Math.sin(angle) * burstSpeed - 5,
+    radius: 8 + Math.random() * 3, alpha: 1, color: '#ffcc33', life: 0, maxLife: 150,
     isGold: true, targetX, targetY
   };
 }

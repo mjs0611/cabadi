@@ -14,6 +14,7 @@ import {
   resetIfNewDay, getTodayMissions, updateMissionProgress, claimMissionReward,
 } from './missions.ts';
 import { SKILLS } from './data.ts';
+import { drawCapybara } from './capy_draw.ts';
 
 // ── AIT ──────────────────────────────────────────────────────────────────────
 const AIT_AD_GROUP_ID = 'ait.v2.live.CABADI_AD_GROUP_ID';
@@ -23,6 +24,10 @@ let aitAdLoaded = false;
 import('@apps-in-toss/web-framework').then((m) => {
   ait = m;
   preloadAd();
+  
+  // iOS 뒤로가기 제스처 비활성화 (가이드 필수)
+  m.setIosSwipeGestureEnabled({ isEnabled: false });
+
   m.getUserKeyForGame().then((result: any) => {
     if (result && result.type === 'HASH') {
       userHash = result.hash;
@@ -31,6 +36,16 @@ import('@apps-in-toss/web-framework').then((m) => {
     }
   }).catch(() => {});
 }).catch(() => {});
+
+// 배경 전환 시 사운드 제어 (가이드 필수)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    sound.pauseAll();
+    game?.pause();
+  } else {
+    sound.resumeAll();
+  }
+});
 
 function preloadAd() {
   if (!ait) return;
@@ -43,23 +58,36 @@ function preloadAd() {
 }
 
 async function showAd(onDone: () => void) {
+  sound.pauseAll(); // 광고 재생 시 게임 사운드 중단
   if (ait && aitAdLoaded) {
     aitAdLoaded = false;
     ait.showFullScreenAd({
       options: { adGroupId: AIT_AD_GROUP_ID },
       onEvent: (event: any) => {
         if (event.type === 'dismissed' || event.type === 'userEarnedReward') {
+          sound.resumeAll();
           onDone();
           preloadAd();
         } else if (event.type === 'failedToShow') {
-          showAdFallback(onDone);
+          showAdFallback(() => {
+            sound.resumeAll();
+            onDone();
+          });
         }
       },
-      onError: () => { showAdFallback(onDone); },
+      onError: () => { 
+        showAdFallback(() => {
+          sound.resumeAll();
+          onDone();
+        });
+      },
     });
     return;
   }
-  showAdFallback(onDone);
+  showAdFallback(() => {
+    sound.resumeAll();
+    onDone();
+  });
 }
 
 function showAdFallback(onDone: () => void) {
@@ -76,18 +104,25 @@ function showAdFallback(onDone: () => void) {
 
 // ── Skill Icons ──────────────────────────────────────────────────────────────
 const SKILL_ICONS: Record<string, string> = {
-  acorn_cannon: '🌰',
-  poison_thorn: '🌵',
-  coconut_bomb: '🥥',
-  mango_laser: '🥭',
-  homing_seed: '🌱',
-  mud_artillery: '⚱️',
-  tropical_lightning: '⚡',
-  palm_fall: '🌴',
+  acorn_cannon: '🌰', poison_thorn: '🌵', coconut_bomb: '🥥', mango_laser: '🥭',
+  homing_seed: '🌱', mud_artillery: '💩', tropical_lightning: '⚡', palm_fall: '🌴',
   hp_regen: '💚',
   shield: '🛡️',
   speed_boost: '💨',
 };
+
+function getRarityName(cost: number) {
+  if (cost >= 7000) return '전설';
+  if (cost >= 2500) return '영웅';
+  if (cost >= 1200) return '희귀';
+  return '일반';
+}
+function getRarityClass(cost: number) {
+  if (cost >= 7000) return 'legendary';
+  if (cost >= 2500) return 'epic';
+  if (cost >= 1200) return 'rare';
+  return 'common';
+}
 
 // ── Elements ─────────────────────────────────────────────────────────────────
 const intro             = document.getElementById('intro')!;
@@ -134,6 +169,84 @@ const missionsItems     = document.getElementById('missionsItems')!;
 const upgradesItems     = document.getElementById('upgradesItems')!;
 const skillSettingList   = document.getElementById('skillSettingList')!;
 
+// Gacha UI
+const drawResultModal    = document.getElementById('drawResultModal')!;
+const drawCapsuleBtn     = document.getElementById('drawCapsuleBtn') as HTMLButtonElement;
+const drawCapsule        = document.getElementById('drawCapsule')!;
+const drawContent        = document.getElementById('drawContent')!;
+const drawRarity         = document.getElementById('drawRarity')!;
+const drawIcon           = document.getElementById('drawIcon')!;
+const drawName           = document.getElementById('drawName')!;
+const drawDesc           = document.getElementById('drawDesc')!;
+const drawCompensation   = document.getElementById('drawCompensation')!;
+const closeDrawBtn       = document.getElementById('closeDrawBtn')!;
+const cheatBananaBtn    = document.getElementById('cheatBananaBtn')!;
+
+// ── Gacha Logic ──
+drawCapsuleBtn.addEventListener('click', () => {
+  const drawCost = 1500;
+  if (!spendBananas(userHash, drawCost)) return;
+
+  const upgrades = getCapyUpgrades(userHash);
+  const result = drawCapybara(upgrades.unlockedCapyTypes);
+
+  // Animation Sequence
+  drawResultModal.classList.remove('hidden');
+  drawCapsule.classList.remove('open', 'hidden');
+  drawContent.classList.add('hidden');
+  drawCompensation.classList.add('hidden');
+  sound.upgrade(); // Use upgrade sound for shake
+
+  setTimeout(() => {
+    drawCapsule.classList.add('open');
+    sound.enemyDie(); // Burst sound
+    
+    setTimeout(() => {
+      drawCapsule.classList.add('hidden');
+      drawContent.classList.remove('hidden');
+      
+      // Setup Result UI
+      drawRarity.textContent = getRarityName(result.capy.cost);
+      drawRarity.className = `draw-rarity ${getRarityClass(result.capy.cost)}`;
+      if (result.capy.icon.startsWith('/')) {
+        drawIcon.innerHTML = `<img src="${result.capy.icon}" style="width:100%;height:100%;object-fit:contain;">`;
+      } else {
+        drawIcon.textContent = result.capy.icon;
+      }
+      drawName.textContent = result.capy.name;
+      drawDesc.textContent = result.capy.description;
+      
+      if (result.isDuplicate) {
+        drawCompensation.textContent = `+${result.compensation} 🍌 (중복 보상)`;
+        drawCompensation.classList.remove('hidden');
+        addBananas(userHash, result.compensation);
+      } else {
+        upgrades.unlockedCapyTypes.push(result.capy.id);
+        saveCapyUpgrades(userHash, upgrades);
+      }
+      
+      renderShop();
+      updateLobbyStats();
+    }, 500);
+  }, 1500);
+});
+
+closeDrawBtn.addEventListener('click', () => {
+  drawResultModal.classList.add('hidden');
+});
+
+cheatBananaBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  addBananas(userHash, 5000);
+  updateLobbyStats();
+  sound.upgrade();
+  
+  const shopTab = document.getElementById('tab-shop');
+  if (shopTab && shopTab.classList.contains('active')) {
+    renderShop();
+  }
+});
+
 const waveAnnounce      = document.getElementById('waveAnnounce')!;
 const baseFlash         = document.getElementById('baseFlash')!;
 
@@ -158,8 +271,8 @@ function updateLobbyStats() {
   
   const lobbyHeroImg = document.querySelector('#lobbyCapybaraHero img') as HTMLImageElement;
   if (lobbyHeroImg) {
-    lobbyHeroImg.src = '/assets/images/sprites/hero_capybara_v8.png';
-    lobbyHeroImg.style.filter = 'drop-shadow(0 20px 40px rgba(0,0,0,0.6))';
+    lobbyHeroImg.src = capyType.icon;
+    lobbyHeroImg.style.filter = 'drop-shadow(0 10px 20px rgba(0,0,0,0.4))';
   }
 }
 
@@ -217,27 +330,41 @@ function renderShop() {
   const upgrades = getCapyUpgrades(userHash);
   const bananas = getBananas(userHash);
   shopItems.innerHTML = '';
-  shopItems.className = 'slot-grid';
+  shopItems.className = 'ui-grid';
 
   for (const capy of CAPY_TYPES) {
     const isUnlocked = upgrades.unlockedCapyTypes.includes(capy.id);
     const isSelected = upgrades.selectedCapyType === capy.id;
     const canAfford = bananas >= capy.cost;
+    
+    // Gacha-only characters (Epic and Legendary)
+    const isGachaOnly = capy.cost >= 2500;
+    
+    let tier = 'common';
+    if (capy.cost >= 7000) tier = 'legendary';
+    else if (capy.cost >= 2500) tier = 'epic';
+    else if (capy.cost >= 1200) tier = 'rare';
 
     const el = document.createElement('div');
-    el.className = 'slot-card';
+    el.className = `ui-card ${tier}`;
     el.innerHTML = `
-      <div class="slot-card-icon">${capy.icon}</div>
-      <div class="slot-card-name">${capy.name}</div>
-      <button class="slot-card-btn ${isSelected ? 'active' : (isUnlocked || canAfford) ? '' : 'locked'}">
-        ${isSelected ? '장착 중' : isUnlocked ? '선택' : `${capy.cost} <span class="icon icon-gold"></span>`}
+      <div class="ui-card-lvl">${tier === 'legendary' ? '전설' : tier === 'epic' ? '영웅' : tier === 'rare' ? '희귀' : '일반'}</div>
+      <div class="ui-card-top">
+        <div class="ui-card-icon">${capy.icon.startsWith('/') ? `<img src="${capy.icon}" style="width:100%;height:100%;object-fit:contain;">` : capy.icon}</div>
+        <div class="ui-card-info">
+          <div class="ui-card-name">${capy.name}</div>
+        </div>
+      </div>
+      <div class="ui-card-desc">${capy.passiveDesc}</div>
+      <button class="ui-card-btn ${isSelected ? 'active' : (isUnlocked || (canAfford && !isGachaOnly)) ? '' : 'locked'}">
+        ${isSelected ? '장착 됨' : isUnlocked ? '장착하기' : isGachaOnly ? '캡슐 전용' : `<span class="btn-cost">${capy.cost}</span> <span class="icon icon-gold"></span>`}
       </button>
     `;
 
     const btn = el.querySelector('button')!;
     btn.addEventListener('click', () => {
       if (isSelected) return;
-      if (isUnlocked || spendBananas(userHash, capy.cost)) {
+      if (isUnlocked || (!isGachaOnly && spendBananas(userHash, capy.cost))) {
         if (!isUnlocked) upgrades.unlockedCapyTypes.push(capy.id);
         upgrades.selectedCapyType = capy.id;
         saveCapyUpgrades(userHash, upgrades);
@@ -256,21 +383,28 @@ function renderUpgrades() {
   const upgrades = getCapyUpgrades(userHash);
   const bananas = getBananas(userHash);
   upgradesItems.innerHTML = '';
-  upgradesItems.className = 'slot-grid';
+  upgradesItems.className = 'ui-grid';
 
   for (const item of CAPY_SHOP) {
     const currentLevel = (upgrades as any)[item.id] as number;
     const isMax = currentLevel >= item.maxLevel;
     const cost = isMax ? 0 : item.cost(currentLevel);
     const canAfford = bananas >= cost;
+    const progress = (currentLevel / item.maxLevel) * 100;
 
     const el = document.createElement('div');
-    el.className = 'slot-card';
+    el.className = 'ui-card';
     el.innerHTML = `
-      <div class="slot-card-icon">${item.icon}</div>
-      <div class="slot-card-name" style="height:auto; font-size:10px;">${item.name}<br>Lv.${currentLevel}</div>
-      <button class="slot-card-btn ${isMax ? 'active' : canAfford ? '' : 'locked'}">
-        ${isMax ? 'MAX' : `${cost} <span class="icon icon-gold"></span>`}
+      <div class="ui-card-lvl">레벨 ${currentLevel}</div>
+      <div class="ui-card-top">
+        <div class="ui-card-icon">${item.icon}</div>
+        <div class="ui-card-info">
+          <div class="ui-card-name">${item.name}</div>
+        </div>
+      </div>
+      <div class="ui-progress-container"><div class="ui-progress-fill" style="width:${progress}%"></div></div>
+      <button class="ui-card-btn ${isMax ? 'active' : canAfford ? '' : 'locked'}">
+        ${isMax ? 'MAX' : `<span class="btn-cost">${cost}</span> <span class="icon icon-gold"></span>`}
       </button>
     `;
 
@@ -291,18 +425,22 @@ function renderUpgrades() {
 function renderMissions() {
   const missions = getTodayMissions(userHash);
   missionsItems.innerHTML = '';
-  missionsItems.className = 'list-layout';
+  missionsItems.className = 'ui-grid';
 
   for (const m of missions) {
+    const progress = Math.min(100, (m.progress / m.goal) * 100);
     const el = document.createElement('div');
-    el.className = 'list-item';
+    el.className = `ui-card ${m.completed ? 'epic' : ''}`;
     el.innerHTML = `
-      <div class="list-item-content">
-        <div class="list-item-name">${m.desc}</div>
-        <div class="list-item-desc">${m.progress}/${m.goal} 완료됨</div>
+      <div class="ui-card-lvl">${m.completed ? '완료됨' : '진행 중'}</div>
+        <div class="ui-card-info">
+          <div class="ui-card-name">${m.desc}</div>
+        </div>
       </div>
-      <button class="list-item-btn ${m.claimed ? 'claimed' : m.completed ? '' : 'locked'}">
-        ${m.claimed ? '완료' : m.completed ? `받기` : `🔒 ${m.reward}`}
+      <div class="ui-card-desc">${m.progress} / ${m.goal}</div>
+      <div class="ui-progress-container"><div class="ui-progress-fill" style="width:${progress}%"></div></div>
+      <button class="ui-card-btn ${m.claimed ? 'locked' : m.completed ? '' : 'locked'}">
+        ${m.claimed ? '수령 완료' : m.completed ? `보상 받기 (+${m.reward})` : `잠김`}
       </button>
     `;
     if (m.completed && !m.claimed) {
@@ -312,6 +450,7 @@ function renderMissions() {
           addBananas(userHash, reward);
           sound.upgrade();
           renderMissions();
+          updateLobbyStats();
         }
       });
     }
@@ -321,20 +460,26 @@ function renderMissions() {
 
 function renderSkillSetting() {
   skillSettingList.innerHTML = '';
-  skillSettingList.className = 'slot-grid';
+  skillSettingList.className = 'ui-grid';
 
   for (const id in SKILLS) {
     const s = (SKILLS as any)[id];
     const isUnlocked = state.unlockedSkills.includes(id);
     const isActive = state.startingSkillId === id;
+    const tier = s.tier || 'common';
     
     const el = document.createElement('div');
-    el.className = `slot-card tier-${s.tier || 'normal'}`;
+    el.className = `ui-card ${tier}`;
     el.innerHTML = `
-      <span class="tier-label">${s.tier || 'normal'}</span>
-      <div class="slot-card-icon">${SKILL_ICONS[id] || '❓'}</div>
-      <div class="slot-card-name">${s.name}</div>
-      <button class="slot-card-btn ${isActive ? 'active' : isUnlocked ? '' : 'locked'}">
+      <div class="ui-card-lvl">${tier === 'legendary' ? '전설' : tier === 'hero' ? '영웅' : tier === 'unique' ? '희귀' : '일반'} 스킬</div>
+      <div class="ui-card-top">
+        <div class="ui-card-icon">${SKILL_ICONS[id] || '❓'}</div>
+        <div class="ui-card-info">
+          <div class="ui-card-name">${s.name}</div>
+        </div>
+      </div>
+      <div class="ui-card-desc">${s.desc}</div>
+      <button class="ui-card-btn ${isActive ? 'active' : isUnlocked ? '' : 'locked'}">
         ${isActive ? '장착 중' : isUnlocked ? '장착' : '잠김'}
       </button>
     `;
@@ -387,8 +532,8 @@ function onGameOver() {
   saveBestWave(userHash, state.wave - 1);
   const best = getBestWave(userHash);
   goScore.textContent = String(state.wave - 1);
-  goBest.textContent = `최고 기록 ${best} WAVES`;
-  goBananaEarned.textContent = `+${state.sessionBananas}`;
+  goBest.textContent = `최고 기록 ${best} 웨이브`;
+  goBananaEarned.textContent = `+${state.sessionBananas}개`;
   gameOverEl.classList.add('show');
   doubleBananaBtn.style.display = state.sessionBananas > 0 ? 'block' : 'none';
   sound.gameOver();
@@ -410,12 +555,12 @@ function showWaveAnnounce(w: number) {
   waveAnnounce.classList.remove('show'); 
   void waveAnnounce.offsetWidth; 
   
-  let areaName = "Deep Jungle";
-  if (w > 20) areaName = "Ancient Ruins";
-  else if (w > 10) areaName = "Golden Oasis";
+  let areaName = "도마뱀의 숲";
+  if (w > 20) areaName = "고대 유적지";
+  else if (w > 10) areaName = "황금 오아시스";
   
   waveAnnounce.style.whiteSpace = 'pre-wrap';
-  waveAnnounce.innerHTML = `Area ${areaName}\nWAVE ${w}`; 
+  waveAnnounce.innerHTML = `${areaName}\n웨이브 ${w}`; 
   waveAnnounce.classList.add('show'); 
   
   updateWaveProgress(0); 
@@ -444,7 +589,17 @@ function updateBossHpLoop(boss: any) {
 
 function showLevelUpSplash(skillType: string) {
   levelUpSplash.classList.remove('hidden');
-  lvlUpSkillName.textContent = skillType.replace('_', ' ').toUpperCase();
+  const typeMap: Record<string, string> = {
+    'acorn_cannon': '도토리 캐논',
+    'poison_thorn': '독가시',
+    'coconut_bomb': '코코넛 폭탄',
+    'mango_laser': '망고 레이저',
+    'homing_seed': '추적 씨앗',
+    'mud_artillery': '진흙 대포',
+    'tropical_lightning': '열대 번개',
+    'palm_fall': '야자수 폭격'
+  };
+  lvlUpSkillName.textContent = typeMap[skillType] || skillType.toUpperCase();
   setTimeout(() => levelUpSplash.classList.add('hidden'), 1500);
 }
 
@@ -455,6 +610,7 @@ function showUpgradeScreen() {
     const card = document.createElement('div');
     card.className = 'upgradeCard';
     
+    // Translate Upgrade Names/Descriptions in UI if not already in JSON
     let icon = '✨';
     if (u.id.startsWith('level_up_')) {
       const skillId = u.id.replace('level_up_', '');
@@ -536,3 +692,21 @@ retryBtn.addEventListener('click', () => { state = createInitialState(getCapyUpg
 goLobbyBtn.addEventListener('click', () => { gameOverEl.classList.remove('show'); openLobby(); });
 hudMissionsBtn.addEventListener('click', () => { game?.pause(); topBar.classList.remove('hidden'); bottomNav.classList.remove('hidden'); lobbyTabs.classList.remove('hidden'); showTab('missions'); });
 soundBtn.addEventListener('click', () => { const on = sound.toggle(); soundBtn.textContent = on ? '🔊' : '🔇'; });
+
+// 종료 컨펌 연동
+const closeConfirm = document.getElementById('closeConfirm')!;
+const closeYes = document.getElementById('closeYes')!;
+const closeNo = document.getElementById('closeNo')!;
+
+// (참고) 게임 내에서 종료 팝업을 띄우고 싶을 때 호출하는 예시 함수
+(window as any).requestClose = () => { closeConfirm.classList.add('show'); };
+
+closeNo.addEventListener('click', () => { closeConfirm.classList.remove('show'); });
+closeYes.addEventListener('click', () => {
+  if (ait && ait.close) {
+    ait.close();
+  } else {
+    // 대체 동작 (웹 브라우저 등)
+    window.history.back();
+  }
+});

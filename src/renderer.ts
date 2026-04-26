@@ -16,21 +16,21 @@ const SKILL_SHEETS: Record<string, { s1: string; s2: string }> = {
 };
 
 const MONSTER_SHEETS = {
-  normal:       SPRITE_DIR + 'monster_tier1_sheet1_normal_1775317541532_fixed.png',
-  intermediate: SPRITE_DIR + 'monster_tier2_intermediate_sheet.png',
-  elite:        SPRITE_DIR + 'monster_tier3_elite_sheet.png',
-  boss:         SPRITE_DIR + 'monster_tier4_boss_sheet_fixed.png'
+  normal:       SPRITE_DIR + 'monsters_v5.png',
+  intermediate: SPRITE_DIR + 'monsters_v5.png',
+  elite:        SPRITE_DIR + 'monsters_v5.png',
+  boss:         SPRITE_DIR + 'monsters_v5.png'
 };
 
 const UI_SHEET   = SPRITE_DIR + 'ui_decor_sheet.png';
 const VFX_SHEET  = SPRITE_DIR + 'vfx_combat_sheet.png';
-const CAPYBARA   = SPRITE_DIR + 'capybara_main_sprite_1775313079058.png';
+const CAPYBARA   = SPRITE_DIR + 'hero_v5.png';
 const MONSTER_PREM_1 = SPRITE_DIR + 'monster_premium_tier1.png';
 
 const THEMES: Record<string, { bg: string; overlay: string; decor: string }> = {
-  jungle: { bg: '/assets/images/stage_bg_cute.png', overlay: 'rgba(0,0,5,0.6)', decor: 'jungle' },
-  oasis:  { bg: '/assets/images/stage_bg_oasis.png', overlay: 'rgba(50,30,0,0.5)', decor: 'oasis' },
-  ruins:  { bg: '/assets/images/stage_bg_ruins.png', overlay: 'rgba(10,20,30,0.6)', decor: 'ruins' }
+  jungle: { bg: '/assets/images/stage_bg_cute_v2.png', overlay: 'rgba(255,255,255,0.05)', decor: 'jungle' },
+  oasis:  { bg: '/assets/images/stage_bg_oasis.png', overlay: 'rgba(255,240,200,0.1)', decor: 'oasis' },
+  ruins:  { bg: '/assets/images/stage_bg_ruins.png', overlay: 'rgba(200,200,250,0.1)', decor: 'ruins' }
 };
 
 function getTheme(wave: number) {
@@ -40,12 +40,12 @@ function getTheme(wave: number) {
 }
 
 const imageCache: Record<string, HTMLImageElement | HTMLCanvasElement> = {};
+const patternCache: Record<string, CanvasPattern> = {};
 const processing: Record<string, boolean> = {};
 
 function getImg(src: string): HTMLImageElement | HTMLCanvasElement {
   if (imageCache[src]) return imageCache[src];
   if (processing[src]) {
-    // Return a placeholder or just wait (the first frame might flicker but better than broken sheets)
     const img = new Image(); img.src = src; return img;
   }
   
@@ -54,6 +54,7 @@ function getImg(src: string): HTMLImageElement | HTMLCanvasElement {
   img.src = src; 
   
   img.onload = () => {
+    // Process sprites and sheets to remove solid backgrounds
     if (src.includes('sprites') || src.includes('sheet')) {
       const canvas = document.createElement('canvas');
       canvas.width = img.width;
@@ -65,52 +66,41 @@ function getImg(src: string): HTMLImageElement | HTMLCanvasElement {
           const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
           const data = imgData.data;
           
-          const w = canvas.width, h = canvas.height;
-          // Sample edges more aggressively: many points to find the average background color
-          let sumR = 0, sumG = 0, sumB = 0, count = 0;
-          const samplePoints = [
-            [0,0],[w-1,0],[0,h-1],[w-1,h-1],
-            [Math.floor(w/2),0],[0,Math.floor(h/2)],[w-1,Math.floor(h/2)],[Math.floor(w/2),h-1],
-            [2,2],[w-3,2],[2,h-3],[w-3,h-3]
-          ];
-          
-          for (const [sx, sy] of samplePoints) {
-            const idx = (sy * w + sx) * 4;
-            if (data[idx+3] > 100) { // Only sample mostly opaque edge pixels
-              sumR += data[idx]; sumG += data[idx+1]; sumB += data[idx+2];
-              count++;
-            }
-          }
-          
-          const targetR = count > 0 ? sumR / count : 255;
-          const targetG = count > 0 ? sumG / count : 255;
-          const targetB = count > 0 ? sumB / count : 255;
-          
-          const tolerance = 60; // Increased tolerance
+          // Commercial Grade Chromakey: Remove Magenta (#FF00FF)
+          // Also handle subtle variations (fringing)
           for (let i = 0; i < data.length; i += 4) {
             const r = data[i], g = data[i+1], b = data[i+2];
-            // Remove target color AND any very bright near-white color (common in AI artifacts)
-            if ((Math.abs(r - targetR) < tolerance && Math.abs(g - targetG) < tolerance && Math.abs(b - targetB) < tolerance) ||
-                (r > 245 && g > 245 && b > 245)) {
+            
+            // Magenta detection: High R, High B, Low G
+            // We also detect "nearly white" as a fallback for older assets
+            const isMagenta = r > 180 && b > 180 && g < 150;
+            const isWhite = r > 240 && g > 240 && b > 240;
+
+            if (isMagenta || isWhite) {
               data[i+3] = 0;
             }
           }
-          
-          // Alpha Erode pass: remove 1px fringe
-          const originalAlpha = new Uint8ClampedArray(data.length / 4);
-          for (let i = 0; i < data.length; i += 4) originalAlpha[i/4] = data[i+3];
-          
+
+          // Edge Smoothing (Smoothing any leftover magenta fringe)
+          const w = canvas.width, h = canvas.height;
+          const alphaCopy = new Uint8ClampedArray(data.length / 4);
+          for (let i = 0; i < data.length; i += 4) alphaCopy[i/4] = data[i+3];
+
           for (let y = 1; y < h-1; y++) {
             for (let x = 1; x < w-1; x++) {
-              const i = y * w + x;
-              if (originalAlpha[i] > 0) {
-                // If any neighbor is fully transparent, make this one more transparent (soft erode)
+              const idx = (y * w + x);
+              if (alphaCopy[idx] > 0) {
+                // If any neighbor is transparent, this is an edge
                 const neighbors = [
-                  originalAlpha[i-1], originalAlpha[i+1], 
-                  originalAlpha[i-w], originalAlpha[i+w]
+                  alphaCopy[idx-1], alphaCopy[idx+1], 
+                  alphaCopy[idx-w], alphaCopy[idx+w]
                 ];
                 if (neighbors.some(a => a === 0)) {
-                  data[i*4 + 3] = 0; // Hard erode for cleaner edges
+                  // Clean fringe: If the current pixel has a magenta tint, kill it
+                  const p4 = idx * 4;
+                  if (data[p4] > data[p4+1] + 20 && data[p4+2] > data[p4+1] + 20) {
+                    data[p4+3] = 0;
+                  }
                 }
               }
             }
@@ -118,7 +108,9 @@ function getImg(src: string): HTMLImageElement | HTMLCanvasElement {
 
           ctx.putImageData(imgData, 0, 0);
           imageCache[src] = canvas;
-        } catch(e) {}
+        } catch(e) {
+          imageCache[src] = img;
+        }
       }
     } else {
       imageCache[src] = img;
@@ -149,16 +141,21 @@ export function render(
   const theme = getTheme(state.wave);
   const bgImg = getImg(theme.bg);
   const isBGLoaded = bgImg instanceof HTMLCanvasElement || (bgImg instanceof HTMLImageElement && bgImg.complete);
+  
   if (isBGLoaded) {
-    // Fill the whole canvas with the high-res BG (tiled if needed)
-    const pat = ctx.createPattern(bgImg as CanvasImageSource, 'repeat');
-    if (pat) {
-      ctx.fillStyle = pat;
+    if (!patternCache[theme.bg]) {
+      const pat = ctx.createPattern(bgImg as CanvasImageSource, 'repeat');
+      if (pat) patternCache[theme.bg] = pat;
+    }
+    
+    if (patternCache[theme.bg]) {
+      ctx.fillStyle = patternCache[theme.bg];
       ctx.fillRect(0, 0, w, h);
+    } else {
+      ctx.fillStyle = '#f0f8ff'; ctx.fillRect(0, 0, w, h);
     }
   } else {
-    ctx.fillStyle = '#102015'; 
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#f0f8ff'; ctx.fillRect(0, 0, w, h);
   }
   // Darken overlay specialized per theme
   ctx.fillStyle = theme.overlay;
@@ -233,20 +230,18 @@ function drawCapybara(ctx: CanvasRenderingContext2D, cx: number, cy: number, sta
     }
   }
 
-  const breath = Math.sin(Date.now() / 300) * 0.04;
-  const size = 45 * maxRecentScale; // Reduced from 60 to 45 for better proportions
+  // Exaggerated breath and recoil (Squash and Stretch)
+  const breath = Math.sin(Date.now() / 200) * 0.08;
+  const size = 60 * maxRecentScale; 
   const isLoaded = img instanceof HTMLCanvasElement || (img instanceof HTMLImageElement && img.complete);
   if (isLoaded) {
     ctx.save();
-    ctx.translate(cx + recoilX, cy + Math.sin(Date.now()/500)*3 + recoilY);
-    ctx.scale(1 + breath, 1 - breath * 0.5);
+    ctx.translate(cx + recoilX, cy + Math.sin(Date.now()/300)*5 + recoilY);
+    // Extra squash and stretch
+    ctx.scale(1 + breath, 1 - breath * 0.8);
     
-    // Based on visual inspection: Capybara is a single 1x1 image, centered.
-    // Content BBox analysis: (102, 93) to (537, 546)
-    const sx = 100, sy = 90;
-    const sw = 440, sh = 460;
-    
-    ctx.drawImage(img, sx, sy, sw, sh, -size / 2, -size / 2 * (sh / sw), size, size * (sh / sw));
+    // Simple derpy capy is usually full-frame or centered
+    ctx.drawImage(img, -size / 2, -size / 2, size, size);
     ctx.restore();
   } else {
     ctx.fillStyle = '#c8a97e';
@@ -277,33 +272,34 @@ function drawEnemy(ctx: CanvasRenderingContext2D, e: Enemy, canvasW: number) {
   if (isLoaded) {
     let sx = 0, sy = 0, sw = img.width, sh = img.height;
 
-    if (sheet === MONSTER_PREM_1) {
-      sw = img.width / 3; sh = img.height; 
-      sx = idx * sw; sy = 0;
-    } else if (e.tier === 'normal') {
+    if (sheet === MONSTER_SHEETS.normal || sheet === MONSTER_SHEETS.intermediate || sheet === MONSTER_SHEETS.elite || sheet === MONSTER_SHEETS.boss) {
       sw = img.width / 4; sh = img.height / 4;
       sx = (idx % 4) * sw; sy = Math.floor(idx / 4) * sh;
-    } else if (e.isBoss) {
-      sx = 0; sy = 20; sw = img.width; sh = img.height - 40;
-    } else {
-      sw = img.width / 2; sh = img.height / 2;
-      sx = (idx % 2) * sw; sy = Math.floor(idx / 2) * sh;
+    } else if (sheet === MONSTER_PREM_1) {
+      sw = img.width / 3; sh = img.height; 
+      sx = idx * sw; sy = 0;
     }
     
-    const insetW = sw * 0.1, insetH = sh * 0.1;
+    const insetW = sw * 0.05, insetH = sh * 0.05; // Tighten inset for clean assets
     const finalSX = sx + insetW, finalSY = sy + insetH;
     const finalSW = sw - insetW * 2, finalSH = sh - insetH * 2;
     
-    const drawRadius = e.radius * 2.2; 
+    const drawRadius = e.radius * 2.5; // Slightly larger for better detail
     
     const walkSpeed = e.speed * 100;
     const isWalking = !e.status.slowed || e.status.slowed.factor > 0.1;
     const timeOffset = e.id.charCodeAt(0) * 10;
-    const walkWiggle = isWalking ? Math.sin(Date.now() / (150 - walkSpeed) + timeOffset) * 0.12 : 0;
-    const walkBounce = isWalking ? Math.abs(Math.sin(Date.now() / (100 - walkSpeed/2) + timeOffset)) * (e.radius * 0.25) : 0;
+    
+    // Enhanced Squash and Stretch based on walk cycle
+    const walkPhase = Date.now() / (120 - walkSpeed/2) + timeOffset;
+    const walkBounce = isWalking ? Math.abs(Math.sin(walkPhase)) * (e.radius * 0.5) : 0;
+    const squash = isWalking ? Math.sin(walkPhase * 2) * 0.15 : 0; // Stretch vertically when moving up, squash when landing
 
     ctx.save();
-    ctx.scale(e.x > canvasW / 2 ? 1 : -1, 1);
+    ctx.translate(e.x, e.y - walkBounce);
+    
+    const hitScale = e.flashTicks > 0 ? 1.2 : 1;
+    ctx.scale((e.x > canvasW / 2 ? 1 : -1) * (1 + squash) * hitScale, (1 - squash * 0.5) * hitScale);
     
     ctx.drawImage(img, finalSX, finalSY, finalSW, finalSH, -drawRadius, -drawRadius, drawRadius * 2, drawRadius * 2);
 
@@ -367,7 +363,20 @@ function drawBullet(ctx: CanvasRenderingContext2D, b: Bullet, state: GameState) 
     }
     ctx.scale(scaleX, scaleY);
 
+    ctx.scale(scaleX, scaleY);
+
+    // Apply character-specific tint
     ctx.drawImage(img, idx * sw, 0, sw, sh, -b.radius * 2, -b.radius * 2, b.radius * 4, b.radius * 4);
+    
+    // Tint overlay
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    const color = b.color || '#fff';
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.4; // 40% tint
+    ctx.fillRect(-b.radius * 2, -b.radius * 2, b.radius * 4, b.radius * 4);
+    ctx.restore();
+
     ctx.restore();
 
     // Trails for high level
@@ -392,13 +401,19 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle) {
   if (p.stretch !== undefined) ctx.scale(1, p.stretch);
   
   if (p.isGold && p.targetX !== undefined && p.targetY !== undefined) {
-    // Collect animation: home toward target
-    const dx = p.targetX - p.x;
-    const dy = p.targetY - p.y;
-    const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    const speed = 15;
-    p.vx += (dx/dist * speed - p.vx) * 0.15;
-    p.vy += (dy/dist * speed - p.vy) * 0.15;
+    if (p.life < 25) {
+      // Burst phase: apply gravity and friction
+      p.vx *= 0.9;
+      p.vy += 0.5;
+    } else {
+      // Collect animation: home toward target
+      const dx = p.targetX - p.x;
+      const dy = p.targetY - p.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+      const speed = 25; // faster homing
+      p.vx += (dx/dist * speed - p.vx) * 0.2;
+      p.vy += (dy/dist * speed - p.vy) * 0.2;
+    }
     
     ctx.globalAlpha = p.alpha;
     ctx.fillStyle = '#ffcc33';
@@ -431,13 +446,27 @@ function drawParticle(ctx: CanvasRenderingContext2D, p: Particle) {
 }
 
 function drawFloatingText(ctx: CanvasRenderingContext2D, ft: FloatingText) {
-  const alpha = 1 - ft.life / ft.maxLife;
+  const alpha = 1 - Math.pow(ft.life / ft.maxLife, 2); // Fade out later
+  
+  // Pop-out and arc animation
+  const progress = ft.life / ft.maxLife;
+  const popScale = ft.life < 5 ? 1 + (ft.life / 5) * 0.5 : 1.5 - ((ft.life - 5) / ft.maxLife) * 0.5;
+  const arcX = Math.sin(progress * Math.PI) * 20; // Slight arc
+
+  ctx.save();
   ctx.globalAlpha = alpha;
+  ctx.translate(ft.x + arcX, ft.y);
+  ctx.scale(popScale, popScale);
   ctx.fillStyle = ft.color;
-  ctx.font = 'bold 24px "Space Grotesk", sans-serif';
+  ctx.font = 'bold 24px "Jua", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(ft.text, ft.x, ft.y);
-  ctx.globalAlpha = 1;
+  
+  // Add thick outline for cute commercial look
+  ctx.strokeStyle = '#332211';
+  ctx.lineWidth = 4;
+  ctx.strokeText(ft.text, 0, 0);
+  ctx.fillText(ft.text, 0, 0);
+  ctx.restore();
 }
 
 function drawBackgroundDecor(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number, style: string) {

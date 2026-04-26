@@ -55,6 +55,7 @@
       "name": "망고 레이저",
       "type": "레이저",
       "tier": "unique",
+      "description": "적을 꿰뚫는 강력한 망고 빔을 발사합니다.",
       "levels": [
         {"level": 1, "damage": 20, "cooldown": 0.5, "speed": 800, "pierce": 99},
         {"level": 2, "damage": 25, "cooldown": 0.45, "speed": 820, "pierce": 99},
