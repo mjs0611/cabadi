@@ -1,5 +1,6 @@
 import { createInitialState } from './state.ts';
 import { Game } from './game.ts';
+import { processChromakeyURL } from './renderer.ts';
 import type { Enemy } from './entities.ts';
 import { pickUpgrades } from './upgrades.ts';
 import { sound } from './sound.ts';
@@ -14,6 +15,7 @@ import {
   resetIfNewDay, getTodayMissions, updateMissionProgress, claimMissionReward,
 } from './missions.ts';
 import { SKILLS } from './data.ts';
+import { getStage } from './stages.ts';
 import { drawCapybara } from './capy_draw.ts';
 
 // ── AIT ──────────────────────────────────────────────────────────────────────
@@ -33,6 +35,7 @@ import('@apps-in-toss/web-framework').then((m) => {
       userHash = result.hash;
       localStorage.setItem('userHash', result.hash);
       resetIfNewDay(userHash);
+      updateLobbyStats();
     }
   }).catch(() => {});
 }).catch(() => {});
@@ -150,6 +153,8 @@ const levelUpSplash    = document.getElementById('levelUpSplash') as HTMLElement
 const lvlUpSkillName   = document.getElementById('lvlUpSkillName') as HTMLElement;
 const hudMissionsBtn    = document.getElementById('hudMissionsBtn')!;
 const soundBtn          = document.getElementById('soundBtn')!;
+const ultimateBtn       = document.getElementById('ultimateBtn')!;
+const ultGauge          = document.getElementById('ultGauge')!;
 
 // Overlays
 const upgradeScreen     = document.getElementById('upgradeScreen')!;
@@ -209,7 +214,11 @@ drawCapsuleBtn.addEventListener('click', () => {
       drawRarity.textContent = getRarityName(result.capy.cost);
       drawRarity.className = `draw-rarity ${getRarityClass(result.capy.cost)}`;
       if (result.capy.icon.startsWith('/')) {
-        drawIcon.innerHTML = `<img src="${result.capy.icon}" style="width:100%;height:100%;object-fit:contain;">`;
+        drawIcon.innerHTML = `<img src="" style="width:100%;height:100%;object-fit:contain;">`;
+        processChromakeyURL(result.capy.icon).then(url => {
+          const img = drawIcon.querySelector('img');
+          if (img) img.src = url;
+        });
       } else {
         drawIcon.textContent = result.capy.icon;
       }
@@ -257,6 +266,7 @@ let game: Game | null = null;
 let buffActiveInLobby = false;
 
 resetIfNewDay(userHash);
+updateLobbyStats();
 
 // ── Logic ────────────────────────────────────────────────────────────────────
 function updateLobbyStats() {
@@ -270,10 +280,19 @@ function updateLobbyStats() {
   if (nameEl) nameEl.textContent = capyType.name;
   
   const lobbyHeroImg = document.querySelector('#lobbyCapybaraHero img') as HTMLImageElement;
-  if (lobbyHeroImg) {
-    lobbyHeroImg.src = capyType.icon;
-    lobbyHeroImg.style.filter = 'drop-shadow(0 10px 20px rgba(0,0,0,0.4))';
-  }
+  const introHeroImg = document.querySelector('.intro-hero img') as HTMLImageElement;
+  
+  processChromakeyURL(capyType.icon).then(url => {
+    if (lobbyHeroImg) {
+      lobbyHeroImg.src = url;
+      lobbyHeroImg.style.filter = 'drop-shadow(0 10px 20px rgba(0,0,0,0.4))';
+      lobbyHeroImg.style.opacity = '1';
+    }
+    if (introHeroImg) {
+      introHeroImg.src = url;
+      introHeroImg.style.opacity = '1';
+    }
+  });
 }
 
 function showTab(tabId: string) {
@@ -311,10 +330,14 @@ function startGame() {
   upgradeScreen.classList.remove('show');
   reviveBtn.style.display = '';
 
-  waveNum.textContent = String(state.wave);
+  waveNum.textContent = `Wave ${state.wave}`;
   updateHpBar(state.hp, state.maxHp);
   hudBananas.innerHTML = `<span class="icon icon-gold"></span> ${state.sessionBananas}`;
   updateSkillSlots();
+  ultimateBtn.classList.remove('hidden');
+  ultGauge.style.height = `${state.ultimateGauge}%`;
+  if (state.ultimateGauge >= 100) ultimateBtn.style.boxShadow = '0 0 20px 10px rgba(255, 255, 255, 0.8)';
+  else ultimateBtn.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
 
   game = makeGame();
   showWaveAnnounce(state.wave);
@@ -322,7 +345,7 @@ function startGame() {
 }
 
 function makeGame() {
-  return new Game(canvas, state, onWaveClear, onGameOver, onHpChange, onBananaEarned, onKill, onBaseFlash, onBossSpawn);
+  return new Game(canvas, state, onWaveClear, onStageClear, onGameOver, onHpChange, onBananaEarned, onKill, onBaseFlash, onBossSpawn, onBossHit);
 }
 
 // ── Rendering ────────────────────────────────────────────────────────────────
@@ -350,7 +373,7 @@ function renderShop() {
     el.innerHTML = `
       <div class="ui-card-lvl">${tier === 'legendary' ? '전설' : tier === 'epic' ? '영웅' : tier === 'rare' ? '희귀' : '일반'}</div>
       <div class="ui-card-top">
-        <div class="ui-card-icon">${capy.icon.startsWith('/') ? `<img src="${capy.icon}" style="width:100%;height:100%;object-fit:contain;">` : capy.icon}</div>
+        <div class="ui-card-icon">${capy.icon.startsWith('/') ? `<img src="" data-src="${capy.icon}" style="width:100%;height:100%;object-fit:contain;">` : capy.icon}</div>
         <div class="ui-card-info">
           <div class="ui-card-name">${capy.name}</div>
         </div>
@@ -360,6 +383,14 @@ function renderShop() {
         ${isSelected ? '장착 됨' : isUnlocked ? '장착하기' : isGachaOnly ? '캡슐 전용' : `<span class="btn-cost">${capy.cost}</span> <span class="icon icon-gold"></span>`}
       </button>
     `;
+
+    const img = el.querySelector('img[data-src]') as HTMLImageElement;
+    if (img) {
+      processChromakeyURL(img.getAttribute('data-src')!).then(url => {
+        img.src = url;
+        img.style.opacity = '1';
+      });
+    }
 
     const btn = el.querySelector('button')!;
     btn.addEventListener('click', () => {
@@ -513,25 +544,75 @@ function onKill(isBoss: boolean) {
     bossBar.classList.add('hidden');
   }
   updateWaveProgress();
+
+  if (state.ultimateGauge < 100) {
+    state.ultimateGauge = Math.min(100, state.ultimateGauge + (isBoss ? 20 : 2));
+    ultGauge.style.height = `${state.ultimateGauge}%`;
+    if (state.ultimateGauge >= 100) {
+      ultimateBtn.style.boxShadow = '0 0 20px 10px rgba(255, 255, 255, 0.8)';
+      sound.upgrade(); // Ready sound
+    }
+  }
 }
 function onBaseFlash() { baseFlash.classList.remove('flash'); void baseFlash.offsetWidth; baseFlash.classList.add('flash'); }
 function onBossSpawn(e: any) {
   bossBar.classList.remove('hidden');
   updateBossHpLoop(e);
 }
+function onBossHit() {
+  bossBar.classList.remove('hit');
+  void bossBar.offsetWidth;
+  bossBar.classList.add('hit');
+}
 function onWaveClear() {
-  state.phase = 'upgrade';
   updateMissionProgress(userHash, 'waves', 1);
   sound.waveClear();
-  showUpgradeScreen();
+
+  waveNum.textContent = `Wave ${state.wave}`;
+  showWaveAnnounce(state.wave);
+
+  // 5웨이브마다 업그레이드 선택, 나머지는 자동 진행
+  const prevWave = state.wave - 1;
+  if (prevWave % 5 === 0) {
+    state.phase = 'upgrade';
+    showUpgradeScreen();
+  } else {
+    setTimeout(() => {
+      if (state.phase === 'playing' && game) {
+        game.startWave();
+      }
+    }, 2000);
+  }
+}
+
+function onStageClear() {
+  state.phase = 'stageclear';
+  updateMissionProgress(userHash, 'waves', 1);
+  sound.waveClear();
+  
+  const stageClearEl = document.getElementById('stageClear')!;
+  const stageClearNum = document.getElementById('stageClearNum')!;
+  const stageNextName = document.getElementById('stageNextName')!;
+  
+  stageClearNum.textContent = String(state.stage);
+  
+  if (state.stage < 20) {
+    const nextStage = getStage(state.stage + 1);
+    stageNextName.textContent = nextStage.name;
+  } else {
+    stageNextName.textContent = '게임 클리어!';
+  }
+  
+  stageClearEl.classList.add('show');
 }
 function onGameOver() {
   state.phase = 'gameover';
   hud.classList.remove('show');
+  ultimateBtn.classList.add('hidden');
   addBananas(userHash, state.sessionBananas);
   saveBestWave(userHash, state.wave - 1);
   const best = getBestWave(userHash);
-  goScore.textContent = String(state.wave - 1);
+  goScore.textContent = `S${state.stage} W${state.wave - 1}`;
   goBest.textContent = `최고 기록 ${best} 웨이브`;
   goBananaEarned.textContent = `+${state.sessionBananas}개`;
   gameOverEl.classList.add('show');
@@ -551,19 +632,26 @@ function updateSkillSlots() {
     container.appendChild(slot);
   }
 }
-function showWaveAnnounce(w: number) { 
-  waveAnnounce.classList.remove('show'); 
-  void waveAnnounce.offsetWidth; 
-  
-  let areaName = "도마뱀의 숲";
-  if (w > 20) areaName = "고대 유적지";
-  else if (w > 10) areaName = "황금 오아시스";
-  
+function getWaveTypeLabel(w: number): string {
+  if (w % 10 === 0) return '💀 BOSS';
+  if (w % 7 === 0) return '⚡ RUSH';
+  if (w % 9 === 0) return '🐛 SWARM';
+  if (w % 11 === 0) return '🛡 ARMORED';
+  return '';
+}
+
+function showWaveAnnounce(w: number) {
+  waveAnnounce.classList.remove('show');
+  void waveAnnounce.offsetWidth;
+
+  const typeLabel = getWaveTypeLabel(w);
   waveAnnounce.style.whiteSpace = 'pre-wrap';
-  waveAnnounce.innerHTML = `${areaName}\n웨이브 ${w}`; 
-  waveAnnounce.classList.add('show'); 
-  
-  updateWaveProgress(0); 
+  waveAnnounce.innerHTML = typeLabel
+    ? `<span style="font-size:0.7em;opacity:0.85">${typeLabel}</span>\nWave ${w}`
+    : `Wave ${w}`;
+  waveAnnounce.classList.add('show');
+
+  updateWaveProgress(0);
 }
 
 function updateWaveProgress(forced?: number) {
@@ -632,14 +720,13 @@ function showUpgradeScreen() {
         showLevelUpSplash(u.skillType);
       }
       state.phase = 'playing';
-      waveNum.textContent = String(state.wave);
+      waveNum.textContent = `Wave ${state.wave}`;
       updateHpBar(state.hp, state.maxHp);
       updateSkillSlots();
       hud.classList.add('show');
       sound.upgrade();
-      game = makeGame();
       showWaveAnnounce(state.wave);
-      game.startWave();
+      game!.startWave();
     });
     upgradeCards.appendChild(card);
   }
@@ -693,6 +780,15 @@ goLobbyBtn.addEventListener('click', () => { gameOverEl.classList.remove('show')
 hudMissionsBtn.addEventListener('click', () => { game?.pause(); topBar.classList.remove('hidden'); bottomNav.classList.remove('hidden'); lobbyTabs.classList.remove('hidden'); showTab('missions'); });
 soundBtn.addEventListener('click', () => { const on = sound.toggle(); soundBtn.textContent = on ? '🔊' : '🔇'; });
 
+ultimateBtn.addEventListener('click', () => {
+  if (state.ultimateGauge >= 100 && game) {
+    state.ultimateGauge = 0;
+    ultGauge.style.height = '0%';
+    ultimateBtn.style.boxShadow = '0 4px 10px rgba(0,0,0,0.5)';
+    (game as any).triggerUltimate();
+  }
+});
+
 // 종료 컨펌 연동
 const closeConfirm = document.getElementById('closeConfirm')!;
 const closeYes = document.getElementById('closeYes')!;
@@ -709,4 +805,33 @@ closeYes.addEventListener('click', () => {
     // 대체 동작 (웹 브라우저 등)
     window.history.back();
   }
+});
+
+// 스테이지 클리어 버튼 이벤트
+const stageClearEl = document.getElementById('stageClear')!;
+const stageNextBtn = document.getElementById('stageNextBtn')!;
+const stageLobbyBtn = document.getElementById('stageLobbyBtn')!;
+
+stageNextBtn.addEventListener('click', () => {
+  stageClearEl.classList.remove('show');
+  if (state.stage < 20) {
+    state.stage++;
+    state.wave = 1;
+    state.phase = 'playing';
+    // HP 일부 회복
+    state.hp = Math.min(state.maxHp, state.hp + Math.floor(state.maxHp * 0.3));
+    game = makeGame();
+    showWaveAnnounce(state.wave);
+    game.startWave();
+  } else {
+    // 게임 완전 클리어 - 로비로
+    state = createInitialState(getCapyUpgrades(userHash));
+    openLobby();
+  }
+});
+
+stageLobbyBtn.addEventListener('click', () => {
+  stageClearEl.classList.remove('show');
+  state = createInitialState(getCapyUpgrades(userHash));
+  openLobby();
 });

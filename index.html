@@ -21,7 +21,34 @@
     .intro-hero img { 
       width: 100%; height: auto; 
       filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5)); 
+      opacity: 0; transition: opacity 0.3s ease;
     }
+
+    #stageClear {
+      position: fixed; inset: 0; z-index: 200;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+    }
+    #stageClear.show { display: flex; }
+    .stage-clear-content {
+      background: linear-gradient(135deg, #1a3a1a 0%, #0d2a0d 100%);
+      border: 2px solid #44cc44;
+      border-radius: 24px;
+      padding: 32px 28px;
+      text-align: center;
+      max-width: 340px;
+      width: 90%;
+      box-shadow: 0 0 40px rgba(68,204,68,0.4);
+    }
+    .stage-clear-title {
+      font-size: 28px; font-weight: bold; color: #ffcc33; margin-bottom: 12px;
+      text-shadow: 0 0 20px rgba(255,204,51,0.8);
+    }
+    .stage-clear-num { font-size: 18px; color: #fff; margin-bottom: 8px; }
+    .stage-clear-next { font-size: 14px; color: #aaffaa; margin-bottom: 24px; }
+    .stage-clear-actions { display: flex; flex-direction: column; gap: 10px; }
+
   </style>
 </head>
 <body>
@@ -143,6 +170,10 @@
     <button id="hudMissionsBtn"><span class="icon icon-missions">📋</span></button>
     <button id="soundBtn"><span class="icon icon-sound">🔊</span></button>
   </div>
+  <button id="ultimateBtn" class="hidden" style="position: absolute; bottom: 120px; right: 20px; width: 70px; height: 70px; border-radius: 50%; background: radial-gradient(circle, #33ccff, #0077ff); border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.5); font-weight: bold; font-size: 30px; color: white; z-index: 100; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+    <span id="ultIcon" style="z-index: 2; pointer-events: none;">🍉</span>
+    <div id="ultGauge" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 0%; background: rgba(255,255,255,0.4); z-index: 1; pointer-events: none; transition: height 0.2s;"></div>
+  </button>
 </div>
 
 <!-- Wave Announce -->
@@ -210,6 +241,20 @@
       <p id="drawDesc" class="draw-desc">정밀한 레이저 사격이 가능합니다.</p>
       <div id="drawCompensation" class="draw-comp hidden">+500 🍌 (중복 보상)</div>
       <button id="closeDrawBtn" class="ui-button primary">확인</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- Stage Clear -->
+<div id="stageClear">
+  <div class="stage-clear-content">
+    <div class="stage-clear-title">🎉 스테이지 클리어!</div>
+    <div class="stage-clear-num">스테이지 <span id="stageClearNum">1</span> 완료</div>
+    <div class="stage-clear-next">다음 스테이지: <span id="stageNextName"></span></div>
+    <div class="stage-clear-actions">
+      <button id="stageNextBtn" class="go-btn-v2 primary">다음 스테이지 ▶</button>
+      <button id="stageLobbyBtn" class="go-btn-v2 secondary">로비로</button>
     </div>
   </div>
 </div>

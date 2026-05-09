@@ -10,13 +10,13 @@ export interface ActiveSkill {
 export interface GameState {
   hp: number;
   maxHp: number;
-  wave: number;
+  stage: number;    // 1-20 (스테이지)
+  wave: number;     // 1-50 (스테이지 내 웨이브)
   score: number;
-  phase: 'intro' | 'playing' | 'upgrade' | 'gameover';
+  phase: 'intro' | 'playing' | 'upgrade' | 'stageclear' | 'gameover';
 
   activeSkills: ActiveSkill[];
 
-  // 영구 업그레이드에서 파생된 멀티플라이어
   damageMultiplier: number;
   fireRateMultiplier: number;
   bananaMultiplier: number;
@@ -25,13 +25,16 @@ export interface GameState {
   reflectPercent: number;
   adBuffActive: boolean;
 
-  // 이번 세션 획득 바나나
   sessionBananas: number;
 
-  // 메타 정보
   unlockedSkills: string[];
   startingSkillId: string;
   selectedCapyType: string;
+
+  ultimateGauge: number;
+  currentWeather: 'clear' | 'rain' | 'sandstorm';
+  hotSpringActiveMs: number;
+  frenzyModeMs: number;
 }
 
 const EXTRA_START_SKILLS = ['poison_thorn', 'coconut_bomb', 'mango_laser', 'tropical_lightning'];
@@ -40,14 +43,12 @@ export function createInitialState(upgrades: CapyUpgrades): GameState {
   const capyType = CAPY_TYPES.find(t => t.id === upgrades.selectedCapyType) || CAPY_TYPES[0];
   const maxHp = 100 + upgrades.maxHp * 20 + capyType.hpBonus;
 
-  // Initial skills based on starting skill
   const startingSkillId = upgrades.startingSkillId || 'acorn_cannon';
   const unlockedSkills = upgrades.unlockedSkills || ['acorn_cannon'];
-  
+
   const activeSkills: ActiveSkill[] = [
     { type: startingSkillId, level: 1, lastShot: 0 },
   ];
-  // If user has extra start slots (legacy compatibility)
   for (let i = 0; i < Math.min(upgrades.startSkills, EXTRA_START_SKILLS.length); i++) {
     const type = EXTRA_START_SKILLS[i];
     if (type !== startingSkillId) {
@@ -58,6 +59,7 @@ export function createInitialState(upgrades: CapyUpgrades): GameState {
   return {
     hp: maxHp,
     maxHp,
+    stage: 1,
     wave: 1,
     score: 0,
     phase: 'intro',
@@ -73,5 +75,9 @@ export function createInitialState(upgrades: CapyUpgrades): GameState {
     unlockedSkills,
     startingSkillId,
     selectedCapyType: upgrades.selectedCapyType,
+    ultimateGauge: 0,
+    currentWeather: 'clear',
+    hotSpringActiveMs: 0,
+    frenzyModeMs: 0,
   };
 }
